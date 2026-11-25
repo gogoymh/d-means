@@ -83,7 +83,22 @@ centroids, labels = EMeans(k=1024, nepochs=5).fit(x)
 centroids, labels = OMeans(k=8192, nepochs=2).fit(x)   # two-level assignment
 ```
 
-`decider` is any object with `ask(requests) -> answers`, so you can swap Jev for another decision model or a scripted one in tests.
+### Bring your own decision model
+
+Jev is the default, not a requirement. `decider` takes any of three things:
+
+```python
+from dmeans import DMeans, Jev, LLM
+
+DMeans(k, decider=Jev())                                      # TypeSafe Jev, Decisions API
+DMeans(k, decider=LLM("openai/gpt-5-mini"))                   # any chat model on OpenRouter
+DMeans(k, decider=LLM("qwen3:8b", base_url="http://localhost:11434/v1", api_key_env=None))  # local Ollama
+DMeans(k, decider=lambda state, question: ...)                # your own function
+```
+
+`LLM` speaks any OpenAI-compatible `/chat/completions` endpoint, caches and replays answers offline exactly like `Jev`, and re-asks when a reply is unusable. A function gets one typed question at a time and may answer loosely: `True`, `"87%"`, an option name, or unnormalised scores. Every answer is checked and coerced into one shape before d-means uses it, and a missing answer fails with the question it skipped. Anything else with `ask(requests) -> answers` works too; subclass `CachedDecider` to get the cache for free.
+
+The benchmark numbers above are Jev's. Other models are untested on them.
 
 ## Benchmark
 
@@ -92,7 +107,7 @@ uv run python -m bench.semantic --verify   # offline replay of the committed Jev
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
-uv run pytest                              # 28 offline tests, about 10 s
+uv run pytest                              # 33 offline tests, about 10 s
 ```
 
 Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent are pinned and wait for a live run. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.

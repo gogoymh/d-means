@@ -83,7 +83,8 @@ centroids, labels = OMeans(k=8192, nepochs=2).fit(x)   # two-level assignment
 uv run python -m bench.semantic --verify   # offline replay of the committed Jev answers
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
-uv run pytest                              # 11 offline tests, about 10 s
+uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
+uv run pytest                              # 16 offline tests, about 5 s
 ```
 
 Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type (n=500, k=6) and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (n=3,000, k=50, first MTEB validation split). Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
@@ -104,6 +105,26 @@ Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by an
 <!-- /bench:ablation -->
 
 The same micro-clusters merged by geometry alone gain little. The decisions carry the gain, and each stage adds to it.
+
+**Convergence.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The problem is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics. Decisions come from a simulated decider that reads the hidden topic and answers wrong one time in five, standing in for Jev. o-means draws over e-means: at k=6 it scans every cell.
+
+<!-- bench:convergence -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-topics-dark.svg">
+  <img alt="Clustering accuracy vs. epochs: d-means clears the best baseline's final accuracy after 0.021 epochs" src="assets/convergence-topics-light.svg" width="100%">
+</picture>
+
+| Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 41.1% |
+|:--|--:|--:|--:|--:|
+| k-means | - | 38.3 | 41.1 | 16 |
+| e-means | 38.1 | 40.1 | 40.5 | 3.9 |
+| o-means | 38.1 | 40.1 | 40.5 | 3.9 |
+| **d-means** | **48.0** | **49.8** | **49.9** | **0.021** |
+
+Synthetic topics, mean of 50 seeds. The best baseline ends at 41.1% (k-means, 16 epochs). d-means passes it at its first budget, 0.021 epochs, at least 184x sooner than the fastest baseline gets there (e-means, 3.9 epochs).
+<!-- /bench:convergence -->
+
+Geometry converges, but to the wrong partition. d-means is already past it after one mini-batch, because the decisions, not the epochs, put the topics back together. `bench.convergence --problems trec,stackexchange --seeds 0,1,2 --live --write` draws the same curves on real texts with Jev.
 
 **Engines.** The e-means and o-means reimplementations reproduce what their authors report: e-means passes Lloyd's 25-iteration error within a few epochs, and o-means reaches it with a fraction of the distance computations.
 

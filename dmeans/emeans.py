@@ -144,12 +144,15 @@ class EMeans:
                     nr = self._revive(rng, n_mass, s)
                     revived_total += nr
                     revived = nr > 0
-                c = (s / n_mass[:, None]).astype(np.float32)
+                # a full step (alpha = 1) empties the clusters its batch missed: they keep their centroid
+                live = n_mass > 0
+                c = np.where(live[:, None], s / np.where(live, n_mass, 1.0)[:, None], c).astype(np.float32)
                 self._after_step(t, rec, c, revived)
                 if on_step:
                     on_step(t, c)
         c = self._close(x, labels, c, rec)
         self.centroids, self.labels = c, labels
+        self.epochs_run = total * b / n  # passes over the data actually made (steps x batch / n)
         log.debug("%s done n=%d k=%d steps=%d batch=%d alpha0=%.4f revived=%d", self.name, n, k, total, b, rec["alpha0"], revived_total)
         return c, labels
 

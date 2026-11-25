@@ -1,4 +1,4 @@
-"""Render three clusters of data points next to the D-means wordmark.
+"""Render a letter D of small spheres, clustered at its corners, next to the D-means wordmark.
 
     uv run python assets/banner.py          # writes d-means-banner.png and d-means-banner-dark.png
     uv run python assets/banner.py OUTDIR   # writes them into OUTDIR instead
@@ -25,43 +25,82 @@ LOG = _log.get("banner")
 W, H, SS = 1536, 512, 3  # output size and supersampling per axis
 WORDMARK_AT = (773, 206)  # top-left of assets/wordmark.png on the banner
 
-# Each cluster starts with its centroid sphere, followed by its member spheres.
-# Positions are (x, z, radius), with all spheres resting on the floor.
-CLUSTERS = (
-    ("amber", (
-        (0.05, -1.62, 0.55),
-        (-0.96, -2.06, 0.16),
-        (0.48, -3.90, 0.20),
-        (0.98, -1.90, 0.15),
-        (0.68, -1.07, 0.19),
-        (-0.39, -0.93, 0.17),
-    )),
-    ("teal", (
-        (-1.78, 0.82, 0.57),
-        (-2.67, 0.52, 0.18),
-        (-2.48, -1.09, 0.15),
-        (-0.90, 0.66, 0.19),
-        (-1.39, 1.62, 0.17),
-        (-2.30, 1.58, 0.20),
-    )),
-    ("violet", (
-        (1.78, 1.04, 0.53),
-        (0.88, 0.96, 0.15),
-        (2.46, -1.20, 0.18),
-        (2.77, 0.58, 0.16),
-        (2.39, 1.73, 0.19),
-        (1.26, 1.84, 0.17),
-    )),
-)
-SPHERES = tuple((material, *point) for material, points in CLUSTERS for point in points)
-
 # Studio camera: eye, target, focal length (px) and where the target lands on the banner.
 EYE, TARGET, FOCAL, CENTER = (0.0, 7.0, 10.0), (0.0, 0.25, 0.0), 1120.0, (373.0, 263.0)
 
 KEY = np.array([-0.55, 1.0, 0.35]) / np.linalg.norm([-0.55, 1.0, 0.35])  # softbox, upper left
 KEY_RADIUS = 0.42  # angular radius (rad) of the softbox: wide, soft shadows
 STRIP = np.array([1.0, 0.35, 0.15]) / np.linalg.norm([1.0, 0.35, 0.15])  # thin strip light, right
+REFLECTED = 8  # neighbours each sphere reflects
 RIM = np.array([0.2, 0.45, -1.0]) / np.linalg.norm([0.2, 0.45, -1.0])  # back light (dark theme)
+
+# The letter is laid out on screen, then each sphere is placed on the floor under its spot, so the D
+# reads upright from the camera. Three clusters gather at its corners (top-left, bottom-left and the
+# tip of the bowl); every sphere takes the colour of the nearest centroid, as k-means would.
+D_BOX = (262, 118, 490, 404)  # left, top, right, bottom of the letter on the banner (px)
+D_CENTROIDS = (("amber", (262, 118)), ("violet", (262, 404)), ("teal", (490, 261)))
+D_SEED = 11
+
+
+def d_outline(step: float = 1.0) -> np.ndarray:
+    """Points every `step` px along the outline of a D: stem, top edge, bowl, bottom edge."""
+    left, top, right, bottom = D_BOX
+    r = (bottom - top) / 2
+    cx, cy = right - r, (top + bottom) / 2
+    stem = [(left, y) for y in np.arange(bottom, top, -step)]
+    upper = [(x, top) for x in np.arange(left, cx, step)]
+    a = np.arange(-np.pi / 2, np.pi / 2, step / r)
+    bowl = list(zip(cx + r * np.cos(a), cy + r * np.sin(a)))
+    lower = [(x, bottom) for x in np.arange(cx, left, -step)]
+    return np.array(stem + upper + bowl + lower, float)
+
+
+def d_layout():
+    """Screen-space spheres (material, px, py, radius px): centroids first, then members."""
+    rng = np.random.default_rng(D_SEED)
+    centers = np.array([c for _, c in D_CENTROIDS], float)
+    placed = [(name, x, y, 15.0) for name, (x, y) in D_CENTROIDS]
+
+    def free(x, y, r):
+        return all(np.hypot(x - px, y - py) > r + pr + 3.0 for _, px, py, pr in placed)
+
+    def add(x, y, r):
+        if free(x, y, r):
+            name = D_CENTROIDS[int(np.argmin(np.hypot(*(centers - (x, y)).T)))][0]
+            placed.append((name, x, y, r))
+
+    # along the outline: tight near a centroid, sparse in between
+    path = d_outline()
+    s = 0.0
+    while s < len(path):
+        x, y = path[int(s)]
+        near = np.hypot(*(centers - (x, y)).T).min()
+        add(x + rng.normal(0, 1.5), y + rng.normal(0, 1.5), rng.uniform(6.0, 8.0))
+        s += 23 - 7 * np.exp(-((near / 60) ** 2))
+    # a crowd of extra members around each centroid
+    for _, (cx, cy) in D_CENTROIDS:
+        for _ in range(60):
+            a, d = rng.uniform(0, 2 * np.pi), abs(rng.normal(0, 13)) + 24
+            add(cx + d * np.cos(a), cy + d * np.sin(a), rng.uniform(5.0, 7.0))
+    return placed
+
+
+def floor_spheres(layout):
+    """Back-project screen spheres onto the floor: (material, x, z, radius) in world units."""
+    eye = np.array(EYE)
+    fwd = norm(np.array(TARGET) - eye)
+    right = norm(np.cross(fwd, [0.0, 1.0, 0.0]))
+    up = np.cross(right, fwd)
+    out = []
+    for name, px, py, rp in layout:
+        d = norm((px - CENTER[0]) / FOCAL * right - (py - CENTER[1]) / FOCAL * up + fwd)
+        r = 0.0
+        for _ in range(4):  # the sphere rests on the floor, so its centre sits at height r
+            p = eye + d * (r - eye[1]) / d[1]
+            r = rp * ((p - eye) @ fwd) / FOCAL
+        out.append((name, float(p[0]), float(p[2]), float(r)))
+    return tuple(out)
+
 
 # Backdrop colours (sRGB), wordmark ink, diffuse light (key, sky, ground), the environment the
 # metal reflects (zenith, horizon, floor, softbox, strip, rim) and how much the floor darkens.
@@ -120,6 +159,9 @@ def smoothstep(e0, e1, x):
 
 
 # ---------------------------------------------------------------- scene
+
+SPHERES = floor_spheres(d_layout())
+
 
 def spheres():
     c = np.array([(x, r, z) for _, x, z, r in SPHERES], float)
@@ -206,8 +248,8 @@ def hit_spheres(o, d, centers, radii):
 
 def reflect_spheres(o, d, me, rough, spec, centers, radii, t):
     """Blend the other spheres into a satin reflection, with edges blurred by roughness."""
-    others = sorted((j for j in range(len(radii)) if j != me), key=lambda j: -np.linalg.norm(centers[j] - centers[me]))
-    for j in others:
+    near = sorted((j for j in range(len(radii)) if j != me), key=lambda j: np.linalg.norm(centers[j] - centers[me]))
+    for j in near[:REFLECTED][::-1]:  # only close neighbours show in satin; far ones first
         c, r = centers[j], radii[j]
         oc = o - c
         b = dot(oc, d)

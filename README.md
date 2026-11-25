@@ -1,7 +1,7 @@
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/d-means-banner-dark.png">
-    <img src="assets/d-means-banner.png" alt="D-means beside a letter D of small spheres clustered at its corners" width="960">
+    <img src="assets/d-means-banner.png" alt="D-means beside an enlarged D formed by amber, violet, and teal sphere clusters" width="960">
   </picture>
 </h1>
 

@@ -37,8 +37,8 @@ RIM = np.array([0.2, 0.45, -1.0]) / np.linalg.norm([0.2, 0.45, -1.0])  # back li
 # The letter is laid out on screen, then each sphere is placed on the floor under its spot, so the D
 # reads upright from the camera. Three clusters gather at its corners (top-left, bottom-left and the
 # tip of the bowl); every sphere takes the colour of the nearest centroid, as k-means would.
-D_BOX = (262, 118, 490, 404)  # left, top, right, bottom of the letter on the banner (px)
-D_CENTROIDS = (("amber", (262, 118)), ("violet", (262, 404)), ("teal", (490, 261)))
+D_BOX = (262, 118, 500, 394)  # left, top, right, bottom of the letter on the banner (px)
+D_CENTROIDS = (("amber", (262, 118)), ("violet", (262, 394)), ("teal", (500, 256)))
 D_SEED = 11
 
 

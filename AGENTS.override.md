@@ -1,0 +1,1 @@
+CLAUDE.local.md를 따른다.

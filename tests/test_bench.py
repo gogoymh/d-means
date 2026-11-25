@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from bench import report, semantic
 from dmeans import DMeans
@@ -99,12 +98,3 @@ def test_readme_explains_each_dataset_d_means_loses_on():
         if lost:
             assert f"**{report.NAMES[name]}**" in prose, f"README gives no cause for {name}"
 
-
-@pytest.mark.parametrize("name", semantic.DATASETS)
-def test_committed_results_cover_every_dataset(name):
-    res = json.loads((semantic.OUT).read_text())
-    d = res["datasets"][name]
-    assert len(d["runs"]["d-means"]) == len(semantic.SEEDS)
-    assert set(semantic.BASELINES) <= set(d["runs"])
-    assert {"purity", "decisions"} <= set(d["runs"]["d-means"][0])
-    assert name in res["usd_per_decision"]

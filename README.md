@@ -92,12 +92,12 @@ uv run python -m bench.semantic --verify   # offline replay of the committed Jev
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
-uv run pytest                              # 16 offline tests, about 5 s
+uv run pytest                              # 28 offline tests, about 10 s
 ```
 
-Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type, [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split), [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group (empty posts dropped) and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent, all test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
+Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent are pinned and wait for a live run. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
 
-**Ablations.** Every variant tried is listed. Defaults were fixed before the first run on TREC and StackExchange and were not touched when the other four datasets were added.
+**Ablations.** Every variant tried is listed. Defaults were fixed before the first run and none was tuned on these datasets.
 
 <!-- bench:ablation -->
 | Variant | TREC | StackExchange | decisions / point |
@@ -163,7 +163,7 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 - d-means takes one input the baselines cannot: `about`, a few words that name the grouping ("news topic", "customer request"). Distance has no way to know you mean answer type rather than subject. No label names go in.
 - It needs something Jev can read for each point. On bare vectors use `EMeans` or `OMeans`.
 - It optimizes agreement with human categories, not squared error. Its engine is e-means, so it keeps e-means' speed.
-- Measured on two datasets so far. Loaders for AG News, BBC News, 20 Newsgroups and Banking77 are wired in `bench/data.py`, waiting for a live run.
+- Measured on two datasets so far. The other four load from pinned files in `bench/data.py`; their live run (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new Jev decisions, an estimated $1 to $2.
 - Replay rebuilds the exact requests, so it needs the embeddings in `.cache/emb`. A fresh clone re-embeds through OpenRouter on the first run.
 
 ## Background: e-means and o-means

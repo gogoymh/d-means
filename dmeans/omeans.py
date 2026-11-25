@@ -3,8 +3,9 @@
 e-means with a two-level assignment: the k centroids are grouped into `nlist` coarse cells
 by Lloyd iterations on the centroids, and each row is compared only with the centroids of
 its `nprobe` nearest cells (plus the child and grandchild split from its best match since the
-last rebuild). Cells are re-sorted after every revival check in the first pass and rebuilt
-every half pass after it. Runs shorter than 2 epochs close with a recency-weighted mean.
+last rebuild). This is the approximate IVF assignment of the e-means paper, Section 3.4,
+which reports it 34x cheaper at 10B points. Cells are re-sorted after every revival check
+in the first pass and rebuilt every half pass after it. Runs shorter than 2 epochs close with a recency-weighted mean.
 """
 
 import math

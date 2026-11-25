@@ -1,4 +1,4 @@
-"""The README banner: three clusters in light and dark variants."""
+"""The README banner: a letter D of clustered spheres, in light and dark variants."""
 
 import importlib.util
 import re
@@ -26,32 +26,62 @@ def luma(img):
     return img.astype(float) @ [0.2126, 0.7152, 0.0722]
 
 
-@pytest.mark.parametrize("theme", BANNERS)
-def test_scene_shows_three_separated_clusters(theme):
+def blobs(theme):
+    """Every sphere in the PNG: (label image, centres (y, x), areas, dominant channel)."""
     img = load(theme)
-    saturated = np.ptp(img, axis=2) >= 24
+    saturated = np.ptp(img, axis=2) >= 24  # the neutral backdrop and wordmark fall below this
+    labels, count = ndimage.label(saturated)
+    idx = np.arange(1, count + 1)
+    areas = ndimage.sum(saturated, labels, idx)
+    keep = idx[areas >= 15]
+    centres = np.array(ndimage.center_of_mass(saturated, labels, keep))
+    dominant = np.array([np.bincount(img.argmax(axis=2)[labels == k], minlength=3).argmax() for k in keep])
+    return saturated, centres, areas[keep - 1], dominant
+
+
+@pytest.mark.parametrize("theme", BANNERS)
+def test_d_made_of_spheres(theme):
+    saturated, centres, _, _ = blobs(theme)
     assert not saturated[:, banner.WORDMARK_AT[0]:].any()
-    dominant = img.argmax(axis=2)
-    centroids, members = [], []
+    assert len(centres) >= 20, len(centres)
+    (top, left), (bottom, right) = centres.min(axis=0), centres.max(axis=0)
+    h, w = bottom - top, right - left
+    assert 0.6 < w / h < 1.2, (w, h)  # upright letter proportions
+    # stem: a column of spheres down the left edge covering most of the height
+    stem = centres[np.abs(centres[:, 1] - np.median(centres[centres[:, 1] < left + 0.2 * w, 1])) < 10]
+    assert np.ptp(stem[:, 0]) > 0.75 * h and len(stem) >= 8, stem
+    # bowl: spheres on the right at mid height, and an empty counter inside the D
+    assert (np.abs(centres[centres[:, 1] > right - 0.15 * w, 0] - (top + bottom) / 2) < 0.2 * h).any()
+    y0, y1, x0, x1 = (int(v) for v in (top + 0.3 * h, bottom - 0.3 * h, left + 0.2 * w, right - 0.4 * w))
+    assert not saturated[y0:y1, x0:x1].any()
 
-    # The neutral studio backdrop falls below the saturation threshold. Amber, teal and
-    # violet have different dominant channels, so each sphere is measurable in the PNG.
+
+@pytest.mark.parametrize("theme", BANNERS)
+def test_corners_are_denser(theme):
+    _, centres, areas, dominant = blobs(theme)
+    (top, left), (bottom, right) = centres.min(axis=0), centres.max(axis=0)
+    mid_stem = np.array([(top + bottom) / 2, left])
+
+    def crowd(at):
+        return (np.linalg.norm(centres - at, axis=1) < 55).sum()
+
+    # amber (red), teal (green) and violet (blue): each group's largest sphere is its centroid
+    corners = []
     for channel in range(3):
-        labels, count = ndimage.label(saturated & (dominant == channel))
-        areas = np.bincount(labels.ravel())[1:]
-        visible = np.flatnonzero(areas >= 40) + 1
-        assert len(visible) == 6, (theme, channel, count, areas)
-        order = visible[np.argsort(areas[visible - 1])[::-1]]
-        assert areas[order[0] - 1] >= 4 * areas[order[1] - 1]
-        center, *points = ndimage.center_of_mass(saturated, labels, order)
-        points = np.array(points)
-        assert np.all(points.min(axis=0) < center)
-        assert np.all(points.max(axis=0) > center)
-        centroids.append(center)
-        members.append(points)
-
-    distances = np.linalg.norm(np.array(members)[:, :, None] - np.array(centroids), axis=-1)
-    assert np.array_equal(distances.argmin(axis=-1), np.repeat(np.arange(3)[:, None], 5, axis=1))
+        group = np.flatnonzero(dominant == channel)
+        assert len(group) >= 10, (channel, len(group))
+        biggest = group[np.argmax(areas[group])]
+        assert areas[biggest] >= 3 * np.median(areas[group])
+        corners.append(centres[biggest])
+        assert crowd(centres[biggest]) >= 3 * crowd(mid_stem), (channel, crowd(centres[biggest]), crowd(mid_stem))
+    amber, teal, violet = corners
+    h, w = bottom - top, right - left
+    assert np.linalg.norm(amber - (top, left)) < 0.2 * h  # top-left corner
+    assert np.linalg.norm(violet - (bottom, left)) < 0.2 * h  # bottom-left corner
+    assert teal[1] > right - 0.2 * w  # tip of the bowl
+    # every sphere belongs to its nearest centroid, as in k-means
+    nearest = np.linalg.norm(centres[:, None] - np.array(corners), axis=-1).argmin(axis=1)
+    assert (nearest == dominant).mean() >= 0.95
 
 
 def test_readme_shows_dark_and_light_banners():

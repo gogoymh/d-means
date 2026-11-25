@@ -1,5 +1,8 @@
 <h1 align="center">
-  <img src="assets/d-means-banner.png" alt="D-means" width="960">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/d-means-banner-dark.png">
+    <img src="assets/d-means-banner.png" alt="D-means" width="960">
+  </picture>
 </h1>
 
 <p align="center">

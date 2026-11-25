@@ -21,17 +21,22 @@ k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://githu
 **d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to [Jev](https://docs.typesafe.ai), TypeSafe's System One decision model, which reads the texts and answers typed questions with calibrated probabilities.
 
 <!-- bench:semantic -->
-| Method | TREC ACC | NMI | ARI | StackExchange ACC | NMI | ARI |
-|:--|--:|--:|--:|--:|--:|--:|
-| k-means | 55.6 | 41.3 | 38.0 | 37.6 | 48.1 | 23.1 |
-| e-means | 58.1 | 45.7 | 42.2 | 33.7 | 46.0 | 18.6 |
-| o-means | 58.1 | 45.7 | 42.2 | 34.8 | 46.8 | 20.7 |
-| **d-means** | **65.9** | **48.6** | **46.1** | **42.3** | **52.3** | **28.9** |
+| Dataset | n | k | k-means | e-means | o-means | **d-means** | vs best | Jev cost / run |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 500 | 6 | 55.6 | 58.1 | 58.1 | **65.9** | +7.8 | $0.004 |
+| StackExchange | 3,000 | 50 | 37.6 | 33.7 | 34.8 | **42.3** | +4.7 | $0.033 |
 
-Mean of seeds 0, 1, 2. TREC +7.8 ACC over e-means; StackExchange +4.7 ACC over k-means.
+Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the best baseline. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed).
+
+<details><summary>NMI and ARI</summary>
+
+| Dataset | k-means NMI | e-means NMI | o-means NMI | d-means NMI | k-means ARI | e-means ARI | o-means ARI | d-means ARI |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 41.3 | 45.7 | 45.7 | **48.6** | 38.0 | 42.2 | 42.2 | **46.1** |
+| StackExchange | 48.1 | 46.0 | 46.8 | **52.3** | 23.1 | 18.6 | 20.7 | **28.9** |
+
+</details>
 <!-- /bench:semantic -->
-
-Every d-means number above comes from real Jev 1.14 answers through OpenRouter (8,866 decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz)). d-means wins on every seed of both datasets.
 
 ## How it works
 
@@ -86,22 +91,36 @@ uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run pytest                              # 11 offline tests, about 10 s
 ```
 
-Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type (n=500, k=6) and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (n=3,000, k=50, first MTEB validation split). Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
+Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type, [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split), [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group (empty posts dropped) and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent, all test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
 
-**Ablations.** Every variant tried is listed. Defaults were fixed before the first run and none was tuned on these datasets.
+**Ablations.** Every variant tried is listed. Defaults were fixed before the first run on TREC and StackExchange and were not touched when the other four datasets were added.
 
 <!-- bench:ablation -->
-| Variant | TREC ACC | decisions / point | StackExchange ACC | decisions / point |
-|:--|--:|--:|--:|--:|
-| geometric merge (no decisions) | 59.5 | 0 | 35.9 | 0 |
-| **d-means (default)** | 65.9 | 0.30 | 42.3 | 0.41 |
-| merge only (no point decisions) | 62.3 | 0.15 | 38.9 | 0.26 |
-| point budget 5% | 63.9 | 0.20 | 40.0 | 0.31 |
-| point budget 10% | 64.9 | 0.25 | 41.2 | 0.36 |
-| decision only (no geometric prior) | 66.0 | 0.30 | 42.4 | 0.41 |
-| 10 merge neighbours | 65.3 | 0.38 | 42.5 | 0.59 |
-| spectral merge | 61.7 | 0.30 | 41.5 | 0.41 |
+| Variant | TREC | StackExchange | decisions / point |
+|:--|--:|--:|--:|
+| best baseline | 58.1 | 37.6 | 0 |
+| geometric merge (no decisions) | 59.5 | 35.9 | 0 |
+| **d-means (default)** | 65.9 | 42.3 | 0.30 to 0.41 |
+| merge only (no point decisions) | 62.3 | 38.9 | 0.15 to 0.26 |
+| point budget 5% | 63.9 | 40.0 | 0.20 to 0.31 |
+| point budget 10% | 64.9 | 41.2 | 0.25 to 0.36 |
+| decision only (no geometric prior) | 66.0 | 42.4 | 0.30 to 0.41 |
+| 10 merge neighbours | 65.3 | 42.5 | 0.38 to 0.59 |
+| spectral merge | 61.7 | 41.5 | 0.30 to 0.41 |
+
+ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
+
+### Where d-means loses
+
+<!-- bench:diagnose -->
+| Dataset | best baseline | micro-cluster purity | geometric merge | Jev merge | after settle | Noul AUC | settle moves right / wrong |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 58.1 | - | 59.5 | 62.3 | 65.9 | - | - |
+| StackExchange | 37.6 | - | 35.9 | 38.9 | 42.3 | - | - |
+
+ACC (%) after each stage of a default run, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. *Noul AUC* ranks Jev's p(same) on the asked pairs against "same majority class" (0.5 is chance). *Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run.
+<!-- /bench:diagnose -->
 
 The same micro-clusters merged by geometry alone gain little. The decisions carry the gain, and each stage adds to it.
 

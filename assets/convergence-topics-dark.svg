@@ -73,6 +73,7 @@
 <circle cx="654.7" cy="254.2" r="4.5" fill="#f0f6fc" stroke="#0d1117" stroke-width="2"/>
 <circle cx="712.6" cy="237.0" r="4.5" fill="#f0f6fc" stroke="#0d1117" stroke-width="2"/>
 </g>
-<text x="82.2" y="278.7" class="k">Clears it after 0.021 epochs</text>
+<line x1="86.2" y1="150" x2="86.2" y2="246.7" stroke="#f0f6fc" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="92.2" y="158" class="k">d-means reaches it at 0.0213 epochs</text>
 <text x="722.6" y="241.0" class="k n">49.9%</text>
 </svg>

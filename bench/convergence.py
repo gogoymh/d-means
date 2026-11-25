@@ -2,7 +2,7 @@
 
     uv run python -m bench.convergence --write    # run, save results/convergence.json
     uv run python -m bench.report                 # redraw the chart and the README block
-    uv run python -m bench.convergence --verify   # rerun offline, fail on drift or if d-means is not fastest
+    uv run python -m bench.convergence --verify   # rerun offline, fail on drift (or if d-means is not fastest on topics)
 
 An epoch is one pass over the data by the geometric engine: one Lloyd iteration for k-means, the
 epoch budget of e-means and o-means, and the epoch budget of the e-means run that builds d-means'
@@ -214,7 +214,10 @@ def run(names: list[str], seeds: list[int], epochs: list[float], live: bool = Fa
 
 
 def verify(result: dict, reference: dict) -> list[str]:
-    """Problems found: accuracy drift from the committed results, or d-means not the fastest."""
+    """Problems found: accuracy drift from the committed results, or d-means not the fastest on the synthetic problem.
+
+    Real datasets are reported as measured, so on them only drift counts.
+    """
     errors = []
     for name, got in result["problems"].items():
         ref = reference["problems"].get(name)
@@ -228,7 +231,7 @@ def verify(result: dict, reference: dict) -> list[str]:
                         errors.append(f"{name}/{m}/seed{got['seeds'][i]}@{t:g}: acc {vb:.6f} != committed {va:.6f}")
         if got["epochs_to_target"] != ref["epochs_to_target"]:
             errors.append(f"{name}: epochs to target {got['epochs_to_target']} != committed {ref['epochs_to_target']}")
-    slow = set(result["problems"]) - set(fastest_problems(result))
+    slow = {n for n, p in result["problems"].items() if p["source"] == "synthetic"} - set(fastest_problems(result))
     errors += [f"{name}: d-means does not reach the target first ({result['problems'][name]['epochs_to_target']})" for name in sorted(slow)]
     return errors
 
@@ -245,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seeds", default=",".join(map(str, SEEDS)))
     ap.add_argument("--live", action="store_true", help="ask Jev for answers missing from the cache (real datasets)")
     ap.add_argument("--write", action="store_true", help="save results/convergence.json")
-    ap.add_argument("--verify", action="store_true", help="fail unless results match results/convergence.json and d-means is fastest")
+    ap.add_argument("--verify", action="store_true", help="fail unless results match results/convergence.json (and d-means is fastest on topics)")
     a = ap.parse_args(argv)
     _log.setup()
     t0 = time.perf_counter()
@@ -272,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             log.error("verify: %s", e)
         if errors:
             return 1
-        log.info("verify: results match %s and d-means reaches the target first on %s (%.1fs)", OUT.name, ", ".join(result["problems"]), time.perf_counter() - t0)
+        log.info("verify: results match %s for %s; d-means reaches the target first on %s (%.1fs)", OUT.name, ", ".join(result["problems"]), ", ".join(fastest_problems(result)) or "none", time.perf_counter() - t0)
     return 0
 
 

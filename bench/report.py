@@ -169,6 +169,34 @@ def mse_table(res: dict) -> str:
     return "\n".join(rows)
 
 
+def _decider(p: dict) -> str:
+    d = chart.decider(p)
+    return d if d != p["decider"] else "a " + d.replace("simulated,", "simulated decider,")
+
+
+def reach_sentence(p: dict) -> tuple[str, str]:
+    """(chart alt text, README sentence): whether d-means reaches the best baseline's final accuracy first, as measured."""
+    reach = p["epochs_to_target"]
+    d = reach["d-means"]
+    base = min((reach[m], m) for m in BASELINES if reach[m] is not None)
+    if d is None:
+        best = max(p["mean"]["d-means"])
+        return (
+            "d-means never reaches the best baseline's final accuracy",
+            f"d-means does not reach it at any budget: its best is {100 * best:.1f}%. {base[1]} gets there first, at {base[0]:.3g} epochs.",
+        )
+    when = f"at its first budget, {d:.3g} epochs" if d == p["passes"]["d-means"][0] else f"at {d:.3g} epochs"
+    if d < base[0]:
+        return (
+            f"d-means clears the best baseline's final accuracy after {d:.3g} epochs",
+            f"d-means passes it {when}, {base[0] / d:.0f}x sooner than the fastest baseline gets there ({base[1]}, {base[0]:.3g} epochs).",
+        )
+    return (
+        f"d-means reaches the best baseline's final accuracy after {d:.3g} epochs, not first",
+        f"d-means reaches it {when}; {base[1]} gets there first, at {base[0]:.3g} epochs.",
+    )
+
+
 def convergence_block(res: dict) -> str:
     parts = []
     for prob, p in res["problems"].items():
@@ -185,17 +213,15 @@ def convergence_block(res: dict) -> str:
                 best = max(a.get(t, 0.0) for a in at.values())
                 cells.append("-" if t not in at[m] else (f"**{_pct(at[m][t])}**" if at[m][t] == best else _pct(at[m][t])))
             r = reach[m]
-            cells.append("never" if r is None else (f"**{r:.2g}**" if r == fastest else f"{r:.2g}"))
+            cells.append("never" if r is None else (f"**{r:.3g}**" if r == fastest else f"{r:.3g}"))
             rows.append(f"| {'**d-means**' if m == 'd-means' else m} | " + " | ".join(cells) + " |")
-        base = min((reach[m], m) for m in BASELINES if reach[m] is not None)
-        alt = f"{chart.TITLE}: d-means clears the best baseline's final accuracy after {reach['d-means']:.2g} epochs"
+        alt, verdict = reach_sentence(p)
         parts.append(
             f'<picture>\n  <source media="(prefers-color-scheme: dark)" srcset="{img}-dark.svg">\n'
-            f'  <img alt="{alt}" src="{img}-light.svg" width="100%">\n</picture>\n\n'
+            f'  <img alt="{chart.TITLE}: {alt}" src="{img}-light.svg" width="100%">\n</picture>\n\n'
             + "\n".join(rows)
-            + f"\n\n{chart.name(p)}, mean of {len(p['acc']['d-means'])} seeds. The best baseline ends at {100 * target['acc']:.1f}% "
-            f"({target['method']}, {chart.frac(target['epochs'])} epochs). d-means passes it at its first budget, {reach['d-means']:.2g} epochs, "
-            f"at least {base[0] / reach['d-means']:.0f}x sooner than the fastest baseline gets there ({base[1]}, {base[0]:.2g} epochs)."
+            + f"\n\n{chart.name(p)}, mean of {len(p['acc']['d-means'])} seeds, decisions from {_decider(p)}. The best baseline ends at {100 * target['acc']:.1f}% "
+            f"({target['method']}, {chart.frac(target['epochs'])} epochs). {verdict}"
         )
     return "\n\n".join(parts)
 

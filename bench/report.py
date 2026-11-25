@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 from . import chart
-from .semantic import ANSWERS, BASELINES, RESULTS, losses
+from .semantic import ANSWERS, BASELINES, MODEL, MODELS, RESULTS, losses, paths
 
 README = Path(__file__).resolve().parent.parent / "README.md"
 ASSETS = README.parent / "assets"
@@ -111,6 +111,53 @@ def semantic_table(res: dict) -> str:
     )
 
 
+def model_results() -> dict[str, dict]:
+    """Every decision model with a committed results file, Jev (the main table) first."""
+    out = {}
+    for model in [MODEL] + sorted(set(MODELS) - {MODEL}):
+        f = paths(model)[1]
+        if f.exists():
+            out[model] = json.loads(f.read_text())
+    return out
+
+
+def models_table(results: dict[str, dict]) -> str:
+    """d-means ACC with each decision model, on every dataset any model has run; "-" where a model has not."""
+    from .semantic import DATASETS
+
+    ds = [d for d in DATASETS if any(d in r["datasets"] for r in results.values())]
+    base = {d: next(r["datasets"][d]["mean"] for r in results.values() if d in r["datasets"]) for d in ds}
+    acc = {m: {d: r["datasets"][d]["mean"]["d-means"]["acc"] for d in ds if d in r["datasets"]} for m, r in results.items()}
+    floor = {d: max(base[d][b]["acc"] for b in BASELINES) for d in ds}
+    top = {d: max([floor[d]] + [a[d] for a in acc.values() if d in a]) for d in ds}
+
+    def cell(v: float, d: str) -> str:
+        return f"**{_pct(v)}**" if v == top[d] else _pct(v)
+
+    rows = [
+        "| Decision model | " + " | ".join(_name(d) for d in ds) + " | wins | cost / decision | answers committed |",
+        "|:--|" + "--:|" * (len(ds) + 3),
+        "| none (best baseline) | " + " | ".join(cell(floor[d], d) for d in ds) + " | - | $0 | - |",
+    ]
+    for m, r in results.items():
+        cells = [cell(acc[m][d], d) if d in acc[m] else "-" for d in ds]
+        wins = sum(acc[m][d] > floor[d] for d in acc[m])
+        usd = r.get("usd_per_decision") or {}
+        rates = [usd[d] for d in acc[m] if isinstance(usd, dict) and d in usd]
+        rate = "-" if not rates else (f"${min(rates) * 1e6:.0f}" if len(rates) == 1 else f"${min(rates) * 1e6:.0f} to {max(rates) * 1e6:.0f}") + " per 1M decisions"
+        n = r.get("jev_answers", 0)
+        rows.append(f"| {MODELS.get(m, m)} (`{m}`) | " + " | ".join(cells) + f" | {wins} of {len(acc[m])} | {rate} | [{n:,}](bench/results/{paths(m)[0].name}) |")
+    seeds = ", ".join(map(str, results[MODEL]["seeds"]))
+    others = [m for m in results if m != MODEL]
+    replay = " ".join(f"`bench.semantic --model {m} --verify` replays {MODELS.get(m, m)} offline." for m in others)
+    return (
+        "\n".join(rows)
+        + f"\n\nd-means ACC (%), mean of seeds {seeds}. Same embeddings, seeds, questions and defaults; only the model answering them changes. "
+        + "*Wins* counts datasets where d-means beats the best baseline. *Cost* is OpenRouter's billed `usage.cost` per decision on the live run. "
+        + replay
+    )
+
+
 def ablation_table(res: dict) -> str:
     ds = list(res["datasets"])
     rows = [
@@ -127,12 +174,13 @@ def ablation_table(res: dict) -> str:
     return "\n".join(rows) + "\n\nACC (%), mean of the same seeds."
 
 
-def diagnose_table(res: dict) -> str:
-    """The "Where d-means loses" section; empty until a live run has recorded stage diagnostics."""
+def diagnose_table(res: dict, model: str = MODEL) -> str:
+    """The "Where d-means loses" section, for `model`'s run; empty until a live run has recorded stage diagnostics."""
+    name = MODELS.get(model, model).split(" ")[0]
     if not any("purity" in r["mean"]["d-means"] for r in res["datasets"].values()):
         return ""
     rows = [
-        "| Dataset | best baseline | micro-cluster purity | geometric merge | Jev merge | after settle | Noul AUC | settle moves right / wrong |",
+        f"| Dataset | best baseline | micro-cluster purity | geometric merge | {name} merge | after settle | Noul AUC | settle moves right / wrong |",
         "|:--|--:|--:|--:|--:|--:|--:|--:|",
     ]
     for d, r in res["datasets"].items():
@@ -151,8 +199,8 @@ def diagnose_table(res: dict) -> str:
         ]
         rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
     return "### Where d-means loses\n\n" + "\n".join(rows) + (
-        "\n\nACC (%) after each stage of a default run, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. "
-        "*Noul AUC* ranks Jev's p(same) on the asked pairs against \"same majority class\" (0.5 is chance). "
+        f"\n\nACC (%) after each stage of a default run with {MODELS.get(model, model)}, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. "
+        f"*Noul AUC* ranks {name}'s p(same) on the asked pairs against \"same majority class\" (0.5 is chance). "
         "*Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run."
     )
 
@@ -237,7 +285,9 @@ def charts() -> dict[Path, str]:
 
 def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
-    blocks = {"semantic": semantic_table(sem), "ablation": ablation_table(sem), "diagnose": diagnose_table(sem)}
+    models = model_results()
+    widest = max(models, key=lambda m: len(models[m]["datasets"]))  # the model that ran the most datasets shows where d-means loses
+    blocks = {"semantic": semantic_table(sem), "models": models_table(models), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

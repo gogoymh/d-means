@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-black">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-black">
-  <img alt="decision model" src="https://img.shields.io/badge/decisions-Jev%201.14-black">
+  <img alt="decision models" src="https://img.shields.io/badge/decisions-Jev%201.14%20%7C%20Clef-black">
   <img alt="deps" src="https://img.shields.io/badge/deps-numpy%20%2B%20scikit--learn-black">
 </p>
 
@@ -21,7 +21,7 @@
 
 k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
 
-**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: any chat LLM, your own function, or [Jev](https://docs.typesafe.ai), TypeSafe's System One model, which ran the benchmark below.
+**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: a typed decision model such as TypeSafe's [Jev](https://docs.typesafe.ai) or Cloudflare's open-weight [Clef](https://blog.cloudflare.com/clef-decision-models), any chat LLM, or your own function. Jev ran the table below; [Clef runs it too](#decision-models).
 
 <!-- bench:semantic -->
 | Dataset | n | k | k-means | e-means | o-means | **d-means** | vs best | Jev cost / run |
@@ -46,17 +46,17 @@ Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the b
 ```mermaid
 flowchart LR
   T[texts + embeddings] --> M["e-means<br/>3k micro-clusters"]
-  M --> N["Jev Noul per neighbour pair<br/><i>same about?</i>"]
+  M --> N["Noul per neighbour pair<br/><i>same about?</i>"]
   N --> L["average linkage on 1 - p<br/>exactly k groups"]
-  L --> C["Jev Choice for the 15%<br/>most borderline points"]
+  L --> C["Choice for the 15%<br/>most borderline points"]
   C --> F["x geometric prior<br/>final labels"]
 ```
 
 1. **Over-cluster.** e-means splits the data into `3k` micro-clusters. They are much purer than `k` clusters.
-2. **Merge by decision.** Each micro-cluster becomes a card: its most distinctive words (class-based TF-IDF) and the four texts nearest its centroid. For every micro-cluster and its six nearest neighbours, Jev answers one Noul: *do these two groups share the same `about`?* Pairs it was not asked get an isotonic prior fitted on the pairs it was asked. Average linkage on `1 - p` joins the micro-clusters into exactly `k` groups.
-3. **Settle the borderline.** The 15% of points with the smallest margin between their two nearest groups get one Choice over their five nearest groups. Jev's probabilities are multiplied by the geometric posterior and the point takes the argmax.
+2. **Merge by decision.** Each micro-cluster becomes a card: its most distinctive words (class-based TF-IDF) and the four texts nearest its centroid. For every micro-cluster and its six nearest neighbours, the decision model answers one Noul: *do these two groups share the same `about`?* Pairs it was not asked get an isotonic prior fitted on the pairs it was asked. Average linkage on `1 - p` joins the micro-clusters into exactly `k` groups.
+3. **Settle the borderline.** The 15% of points with the smallest margin between their two nearest groups get one Choice over their five nearest groups. The model's probabilities are multiplied by the geometric posterior and the point takes the argmax.
 
-Decisions cost about 0.3 to 0.4 per point. At the measured $0.0000265 per decision, a TREC run costs $0.004 and a StackExchange run $0.033.
+Decisions cost about 0.3 to 0.4 per point. At Jev's measured $0.0000265 per decision, a TREC run costs $0.004 and a StackExchange run $0.033.
 
 ## Quick start
 
@@ -67,9 +67,9 @@ export OPENROUTER_API_KEY=sk-or-...
 
 ```python
 from dmeans import DMeans
-from dmeans.deciders import Jev    # or LLM, or your own function
+from dmeans.deciders import Decisions    # or LLM, or your own function
 
-model = DMeans(k=6, decider=Jev(cache="answers.jsonl.gz"),
+model = DMeans(k=6, decider=Decisions("cloudflare/clef", cache="answers.jsonl.gz"),
                about="type of answer the question asks for")
 labels = model.fit(embeddings, texts)   # embeddings: (n, d) float32, texts: n strings
 print(model.report)                     # decisions asked, points moved
@@ -86,30 +86,46 @@ centroids, labels = OMeans(k=8192, nepochs=2).fit(x)   # two-level assignment
 
 ### Bring your own decision model
 
-d-means is tied to no model. Every decision model sits in `dmeans.deciders`, side by side, and `decider` takes any of them:
+d-means is tied to no model, and no model is an import: you name it as a string. `decider` takes any of these:
 
 ```python
 from dmeans import DMeans
-from dmeans.deciders import LLM, Jev
+from dmeans.deciders import Decisions, LLM
 
-DMeans(k, decider=Jev())                                      # TypeSafe Jev, Decisions API
+DMeans(k, decider=Decisions("typesafe/jev-1.14"))             # TypeSafe Jev, OpenRouter Decisions API
+DMeans(k, decider=Decisions("cloudflare/clef"))               # Cloudflare Clef, open weights, same API
 DMeans(k, decider=LLM("openai/gpt-5-mini"))                   # any chat model on OpenRouter
 DMeans(k, decider=LLM("qwen3:8b", base_url="http://localhost:11434/v1", api_key_env=None))  # local Ollama
 DMeans(k, decider=lambda state, question: ...)                # your own function
 ```
 
-`LLM` speaks any OpenAI-compatible `/chat/completions` endpoint, caches and replays answers offline exactly like `Jev`, and re-asks when a reply is unusable. A function gets one typed question at a time and may answer loosely: `True`, `"87%"`, an option name, or unnormalised scores. Every answer is checked and coerced into one shape before d-means uses it, and a missing answer fails with the question it skipped. Anything else with `ask(requests) -> answers` works too; subclass `CachedDecider` to get the cache for free.
+`LLM` speaks any OpenAI-compatible `/chat/completions` endpoint, caches and replays answers offline exactly like `Decisions`, and re-asks when a reply is unusable. A function gets one typed question at a time and may answer loosely: `True`, `"87%"`, an option name, or unnormalised scores. Every answer is checked and coerced into one shape before d-means uses it, and a missing answer fails with the question it skipped. Anything else with `ask(requests) -> answers` works too; subclass `CachedDecider` to get the cache for free.
 
-The benchmark numbers above are Jev's. Other models are untested on them.
+### Decision models
+
+The same benchmark, with only the model that answers the questions swapped:
+
+<!-- bench:models -->
+| Decision model | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | wins | cost / decision | answers committed |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| none (best baseline) | 58.1 | 37.6 | **83.7** | **86.9** | **56.9** | 61.1 | - | $0 | - |
+| Jev 1.14 (`typesafe/jev-1.14`) | 65.9 | 42.3 | - | - | - | - | 2 of 2 | $26 to 27 per 1M decisions | [8,866](bench/results/jev-answers.jsonl.gz) |
+| Clef (`cloudflare/clef`) | **66.8** | **42.4** | 70.0 | 70.2 | 47.2 | **63.5** | 3 of 6 | $87 to 248 per 1M decisions | [35,257](bench/results/clef-answers.jsonl.gz) |
+
+d-means ACC (%), mean of seeds 0, 1, 2. Same embeddings, seeds, questions and defaults; only the model answering them changes. *Wins* counts datasets where d-means beats the best baseline. *Cost* is OpenRouter's billed `usage.cost` per decision on the live run. `bench.semantic --model cloudflare/clef --verify` replays Clef offline.
+<!-- /bench:models -->
+
+Clef edges Jev where both ran and wins Banking77 (k=77). It trails on the three news datasets: there even the geometric merge of the same micro-clusters lands below plain k-means, and Clef's merges do not win it back ([stages](#where-d-means-loses)). Jev has not run those three yet.
 
 ## Benchmark
 
 ```bash
 uv run python -m bench.semantic --verify   # offline replay of the committed Jev answers
+uv run python -m bench.semantic --model cloudflare/clef --verify   # the same for Clef
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
-uv run pytest                              # 40 offline tests, about 10 s
+uv run pytest                              # 44 offline tests, about 20 s
 ```
 
 Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent are pinned and wait for a live run. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
@@ -133,7 +149,18 @@ ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
 
 <!-- bench:diagnose -->
+### Where d-means loses
 
+| Dataset | best baseline | micro-cluster purity | geometric merge | Clef merge | after settle | Noul AUC | settle moves right / wrong |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 58.1 | 69.1 | 59.5 | 63.5 | 66.8 | 0.88 | 22 / 5 |
+| StackExchange | 37.6 | 48.3 | 35.9 | 39.2 | 42.4 | 0.91 | 107 / 13 |
+| AG News | 83.7 | 82.8 | 70.5 | 67.3 | 70.0 | 0.88 | 259 / 67 |
+| BBC News | 86.9 | 94.9 | 86.8 | 69.2 | 70.2 | 0.87 | 20 / 10 |
+| 20 Newsgroups | 56.9 | 62.2 | 47.3 | 45.3 | 47.2 | 0.81 | 195 / 63 |
+| Banking77 | 61.1 | 83.5 | 55.2 | 60.9 | 63.5 | 0.88 | 88 / 7 |
+
+ACC (%) after each stage of a default run with Clef, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. *Noul AUC* ranks Clef's p(same) on the asked pairs against "same majority class" (0.5 is chance). *Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run.
 <!-- /bench:diagnose -->
 
 The same micro-clusters merged by geometry alone gain little. The decisions carry the gain, and each stage adds to it.
@@ -208,7 +235,7 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 - d-means takes one input the baselines cannot: `about`, a few words that name the grouping ("news topic", "customer request"). Distance has no way to know you mean answer type rather than subject. No label names go in.
 - It needs something the decision model can read for each point. On bare vectors use `EMeans` or `OMeans`.
 - It optimizes agreement with human categories, not squared error. Its engine is e-means, so it keeps e-means' speed.
-- Measured on two datasets so far. The other four load from pinned files in `bench/data.py`; their live run (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new Jev decisions, an estimated $1 to $2.
+- Jev is measured on two datasets so far, Clef on all six. Jev's run on the other four (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new decisions, an estimated $1 to $2.
 - Replay rebuilds the exact requests, so it needs the embeddings in `.cache/emb`. A fresh clone re-embeds through OpenRouter on the first run.
 
 ## Background: e-means and o-means

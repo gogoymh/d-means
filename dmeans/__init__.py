@@ -1,4 +1,4 @@
-"""d-means: k-means steered by any typed decision model: a chat LLM, Jev, or your own function.
+"""d-means: k-means steered by any typed decision model: Jev, Clef, a chat LLM, or your own function.
 
 Decision models live in `dmeans.deciders`; nothing here is tied to one of them.
 """

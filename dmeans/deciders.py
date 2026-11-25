@@ -7,12 +7,12 @@ d-means asks typed questions and needs answers back in one compact shape:
               {qid: {option: probability}}      for a Choice (options are the keys of `criteria`)
 
 Anything with `ask(requests) -> answers` is a decider. d-means depends on none of them by name;
-these come built in, side by side:
+these come built in, side by side, and take the model as a string:
 
-    from dmeans.deciders import LLM, Jev
+    from dmeans.deciders import Decisions, LLM
 
+- `Decisions`: a typed decision model (TypeSafe's Jev, Cloudflare's Clef, ...) through OpenRouter's Decisions API.
 - `LLM`: any chat model behind an OpenAI-compatible endpoint (OpenRouter, OpenAI, vLLM, Ollama, ...).
-- `Jev`: TypeSafe's System One decision model through OpenRouter's Decisions API.
 - A plain function `fn(state, question) -> answer`, wrapped by `as_decider`.
 
 `CachedDecider` gives every remote model the same cache, offline replay and concurrency.
@@ -37,7 +37,7 @@ from . import _log
 
 log = _log.get("deciders")
 RETRY_CODES = (408, 429, 500, 502, 503, 504)
-__all__ = ["Decider", "CachedDecider", "FunctionDecider", "LLM", "Jev", "CacheMiss", "as_decider", "coerce", "normalize", "request_key"]
+__all__ = ["Decider", "CachedDecider", "FunctionDecider", "Decisions", "LLM", "CacheMiss", "as_decider", "coerce", "normalize", "request_key"]
 
 
 class CacheMiss(KeyError):
@@ -156,7 +156,9 @@ def post_json(url: str, body: dict, key: str | None, label: str, attempts: int =
             msg = e.read()[:300].decode("utf-8", "replace")
             if e.code == 402:
                 raise RuntimeError(f"{label} HTTP 402: the account has no credits left") from e
-            if e.code not in RETRY_CODES:
+            # Workers AI behind OpenRouter now and then rejects a valid request with a 400 "AiError"; it passes when resent.
+            upstream = e.code == 400 and "AiError" in msg and attempt < 3
+            if e.code not in RETRY_CODES and not upstream:
                 raise RuntimeError(f"{label} HTTP {e.code}: {msg}") from e
             log.warning("%s HTTP %d (attempt %d), retrying in %.0fs: %s", label, e.code, attempt + 1, delay, msg)
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
@@ -345,13 +347,11 @@ class LLM(CachedDecider):
         raise RuntimeError(f"LLM {self.model} gave no usable answer after {self.repairs + 1} tries: {err}")
 
 
-
-# --- Jev, TypeSafe's typed decision model -----------------------------------------------------
-JEV_URL = "https://openrouter.ai/api/alpha/decisions"
-JEV_MODEL = "typesafe/jev-1.14"
+# --- typed decision models ------------------------------------------------------------------
+DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
 
 
-def _jev_compact(answers: dict) -> dict:
+def _compact(answers: dict) -> dict:
     out = {}
     for qid, a in answers.items():
         if a.get("type") == "noul":
@@ -361,13 +361,40 @@ def _jev_compact(answers: dict) -> dict:
     return out
 
 
-class Jev(CachedDecider):
-    """Jev through OpenRouter's Decisions API, which answers typed questions natively (no prompt)."""
+class Decisions(CachedDecider):
+    """A typed decision model through OpenRouter's Decisions API, which answers typed questions natively (no prompt).
 
-    label = "Jev"
+    Decisions("typesafe/jev-1.14")      # TypeSafe Jev
+    Decisions("cloudflare/clef")        # Cloudflare Clef, open weights (Apache 2.0)
+    Decisions("cloudflare/clef-flash")  # its 9B sibling
+    """
 
-    def __init__(self, cache: str | Path | None = None, offline: bool = False, model: str = JEV_MODEL, workers: int = 16):
+    label = "Decisions"
+
+    def __init__(self, model: str, cache: str | Path | None = None, offline: bool = False, workers: int = 16, url: str = DECISIONS_URL, api_key_env: str | None = "OPENROUTER_API_KEY"):
         super().__init__(model, cache, offline, workers)
+        self.url, self.api_key_env = url, api_key_env
 
     def _call(self, req: dict) -> dict:
-        return _jev_compact(self._post(JEV_URL, {"model": self.model, **req}, "OPENROUTER_API_KEY")["answers"])
+        sent, back = _wire(req)
+        ans = _compact(self._post(self.url, {"model": self.model, **sent}, self.api_key_env)["answers"])
+        return {qid: {back[qid].get(o, o): p for o, p in a.items()} if qid in back else a for qid, a in ans.items()}
+
+
+def _wire(req: dict) -> tuple[dict, dict]:
+    """Option names without "/": Cloudflare's Workers AI rejects a Choice with two such names (HTTP 400 AiError).
+
+    The cache key is taken from the request as d-means wrote it, so this only changes what goes over the wire.
+    Returns (request to send, {qid: {sent option: original option}}).
+    """
+    qs, back = {}, {}
+    for qid, q in req["questions"].items():
+        crit = q.get("criteria")
+        if q.get("type") == "choice" and isinstance(crit, dict) and sum("/" in o for o in crit) > 1:
+            names = {o: o.replace("/", "|") for o in crit}
+            if len(set(names.values())) == len(names) and not set(names.values()) & (set(crit) - {o for o in crit if "/" in o}):
+                qs[qid] = {**q, "criteria": {names[o]: v for o, v in crit.items()}}
+                back[qid] = {n: o for o, n in names.items()}
+                continue
+        qs[qid] = q
+    return ({**req, "questions": qs} if back else req), back

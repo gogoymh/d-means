@@ -17,7 +17,7 @@ decision model (any `ask(requests) -> answers`, see dmeans.deciders), which read
    probabilities are multiplied with the geometric posterior and the point takes the argmax.
 
 Every call goes through a decider with `ask(requests) -> answers` (see dmeans.deciders): any
-chat LLM, Jev, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
+chat LLM, Jev, Clef, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
 so the algorithm is tested offline with a scripted decider and replayed offline from cached answers.
 """
 

@@ -3,10 +3,11 @@
     uv run python -m bench.semantic            # replay Jev's cached answers, print the table
     uv run python -m bench.semantic --verify   # also check it matches results/semantic.json
     uv run python -m bench.semantic --live --write   # ask Jev for missing answers, save results
+    uv run python -m bench.semantic --model cloudflare/clef --verify   # the same with Clef
 
 Replay is offline and exact: d-means sends the same requests, and the committed cache returns
-the answers Jev gave when the benchmark was run live. A request missing from the cache fails
-the replay instead of being guessed.
+the answers the model gave when the benchmark was run live. A request missing from the cache
+fails the replay instead of being guessed. Each model keeps its own answers and results file.
 """
 
 import argparse
@@ -21,24 +22,40 @@ from sklearn.metrics import roc_auc_score
 
 from dmeans import DMeans, EMeans, OMeans, _log
 from dmeans.geometry import nearest
-from dmeans.deciders import CacheMiss, Jev
+from dmeans.deciders import CacheMiss, Decisions
 from dmeans.metrics import accuracy, scores
 
 from . import data, embed
 
 log = _log.get("bench.semantic")
 RESULTS = Path(__file__).resolve().parent / "results"
-ANSWERS = RESULTS / "jev-answers.jsonl.gz"
-OUT = RESULTS / "semantic.json"
+MODEL = "typesafe/jev-1.14"  # the decision model behind the main README table
+MODELS = {MODEL: "Jev 1.14", "cloudflare/clef": "Clef", "cloudflare/clef-flash": "Clef-flash"}
 DATASETS = ["trec", "stackexchange", "ag-news", "bbc-news", "20-newsgroups", "banking77"]  # every loader in bench/data.py
 SEEDS = [0, 1, 2]
 BASELINES = ["k-means", "e-means", "o-means"]
-# Cost per Jev decision measured on the live runs (OpenRouter usage.cost / API calls, Jev 1.14).
+# Cost per Jev decision measured on its live runs (OpenRouter usage.cost / API calls, Jev 1.14).
 # trec: 447 calls $0.01175 and stackexchange: 3,684 calls $0.09766 (2026-11-22).
+# Other models record their own rate from usage.cost when run with --live --write.
 USD_PER_DECISION = {
     "trec": round(0.01175 / 447, 8),
     "stackexchange": round(0.09766 / 3684, 8),
 }
+
+
+def slug(model: str) -> str:
+    """"typesafe/jev-1.14" -> "jev", "cloudflare/clef-flash" -> "clef-flash"."""
+    name = model.split("/")[-1]
+    return name.split("-1.")[0] if name.startswith("jev") else name
+
+
+def paths(model: str = MODEL) -> tuple[Path, Path]:
+    """(answer cache, results file) of one decision model; Jev keeps the original names."""
+    s = slug(model)
+    return RESULTS / f"{s}-answers.jsonl.gz", RESULTS / ("semantic.json" if model == MODEL else f"semantic-{s}.json")
+
+
+ANSWERS, OUT = paths()
 
 ABLATIONS = {
     "d-means": {},
@@ -51,10 +68,18 @@ ABLATIONS = {
 }
 
 
-def committed() -> list[str]:
-    """Datasets in results/semantic.json, in DATASETS order: what replay and --verify cover by default."""
-    got = json.loads(OUT.read_text())["datasets"] if OUT.exists() else {}
+def committed(out: Path = OUT) -> list[str]:
+    """Datasets in the results file, in DATASETS order: what replay and --verify cover by default."""
+    got = json.loads(out.read_text())["datasets"] if out.exists() else {}
     return [d for d in DATASETS if d in got] or DATASETS
+
+
+def has_ablations(out: Path) -> bool:
+    """Whether the committed run includes the ablation variants (replay must ask the same questions)."""
+    if not out.exists():
+        return True
+    d = next(iter(json.loads(out.read_text())["datasets"].values()), {})
+    return "merge only (no point decisions)" in d.get("runs", {})
 
 
 def geometric_merge(x: np.ndarray, k: int, seed: int, over: int = 3) -> np.ndarray:
@@ -104,12 +129,12 @@ def diagnose(dm: DMeans, x: np.ndarray, y: np.ndarray) -> dict:
     return out
 
 
-def run(datasets: list[str], seeds: list[int], jev: Jev, ablations: bool = True) -> dict:
+def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool = True) -> dict:
     out = {
         "jev_model": jev.model,
         "embedder": embed.MODEL,
         "seeds": seeds,
-        "usd_per_decision": USD_PER_DECISION,
+        "usd_per_decision": dict(USD_PER_DECISION) if jev.model == MODEL else {},
         "datasets": {},
     }
     for name in datasets:
@@ -137,7 +162,9 @@ def run(datasets: list[str], seeds: list[int], jev: Jev, ablations: bool = True)
                 res.setdefault(label, []).append(row)
             log.info("%s seed %d done", name, seed)
         calls, cost = jev.stats["api_calls"] - calls0, jev.stats["cost_usd"] - cost0
-        log.info("%s: %d Jev API calls cost $%.5f ($%.8f per call)", name, calls, cost, cost / calls if calls else 0.0)
+        log.info("%s: %d %s API calls cost $%.5f ($%.8f per call)", name, calls, jev.model, cost, cost / calls if calls else 0.0)
+        if calls and jev.model != MODEL:
+            out["usd_per_decision"][name] = round(cost / calls, 8)
         out["datasets"][name] = {
             "n": len(ds.texts),
             "k": ds.k,
@@ -195,42 +222,49 @@ def table(result: dict) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--model", default=MODEL, help=f"decision model on OpenRouter's Decisions API, e.g. {', '.join(MODELS)}")
     ap.add_argument("--datasets", default=None, help=f"comma-separated, from {','.join(DATASETS)} (default: the committed ones)")
     ap.add_argument("--seeds", default=",".join(map(str, SEEDS)))
-    ap.add_argument("--live", action="store_true", help="call Jev for answers missing from the cache")
-    ap.add_argument("--write", action="store_true", help="save results/semantic.json and prune the answer cache")
-    ap.add_argument("--verify", action="store_true", help="fail unless results match results/semantic.json and d-means wins")
+    ap.add_argument("--live", action="store_true", help="ask the model for answers missing from the cache")
+    ap.add_argument("--write", action="store_true", help="save the results file and prune the answer cache")
+    ap.add_argument("--verify", action="store_true", help="fail unless results match the committed results file")
     ap.add_argument("--no-ablations", action="store_true")
     a = ap.parse_args(argv)
     _log.setup()
-    jev = Jev(ANSWERS, offline=not a.live)
+    answers, out = paths(a.model)
+    jev = Decisions(a.model, answers, offline=not a.live)
     try:
-        names = a.datasets.split(",") if a.datasets else committed()
-        result = run(names, [int(s) for s in a.seeds.split(",")], jev, ablations=not a.no_ablations)
+        names = a.datasets.split(",") if a.datasets else committed(out)
+        result = run(names, [int(s) for s in a.seeds.split(",")], jev, ablations=not a.no_ablations and has_ablations(out))
     except CacheMiss as e:
-        log.error("Jev answer %s is not in %s; run with --live to ask Jev", e, ANSWERS)
+        log.error("%s answer %s is not in %s; run with --live to ask it", a.model, e, answers)
         return 2
     finally:
         if a.live:
             jev.save()
+    if out.exists() and a.model != MODEL:  # keep the measured rate on offline replays
+        result["usd_per_decision"] = {**json.loads(out.read_text()).get("usd_per_decision", {}), **result["usd_per_decision"]}
     result["jev_requests"] = jev.stats["requests"]
     result["jev_api_calls"] = jev.stats["api_calls"]
     result["jev_answers"] = len(jev.used)
-    log.info("Jev: %d requests, %d answers used, %d API calls, $%.5f, %d retries", jev.stats["requests"], len(jev.used), jev.stats["api_calls"], jev.stats["cost_usd"], jev.stats["retries"])
+    log.info("%s: %d requests, %d answers used, %d API calls, $%.5f, %d retries", a.model, jev.stats["requests"], len(jev.used), jev.stats["api_calls"], jev.stats["cost_usd"], jev.stats["retries"])
     print(table(result))
     if a.write:
         RESULTS.mkdir(exist_ok=True)
-        OUT.write_text(json.dumps(result, indent=1) + "\n")
+        out.write_text(json.dumps(result, indent=1) + "\n")
         jev.save(keep=jev.used)
-        log.info("wrote %s", OUT)
+        log.info("wrote %s", out)
     if a.verify:
-        errors = verify(result, json.loads(OUT.read_text()))
+        if not out.exists():
+            log.error("verify: %s does not exist; run with --live --write first", out)
+            return 1
+        errors = verify(result, json.loads(out.read_text()))
         for e in errors:
             log.error("verify: %s", e)
         if errors:
             return 1
         lost = {n: m for n, m in losses(result).items() if m}
-        log.info("verify: results match %s; %d requests answered from %d cached Jev answers, %d API calls", OUT.name, jev.stats["requests"], len(jev.used), jev.stats["api_calls"])
+        log.info("verify: results match %s; %d requests answered from %d cached %s answers, %d API calls", out.name, jev.stats["requests"], len(jev.used), a.model, jev.stats["api_calls"])
         log.info("verify: d-means beats the best baseline on every metric of %d of %d datasets; trails on %s", len(result["datasets"]) - len(lost), len(result["datasets"]), lost or "none")
         if jev.stats["api_calls"]:
             return 1

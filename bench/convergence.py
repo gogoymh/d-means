@@ -27,10 +27,10 @@ import numpy as np
 
 from dmeans import DMeans, EMeans, OMeans, _log, lloyd
 from dmeans.geometry import nearest
-from dmeans.deciders import CacheMiss, Jev, request_key
+from dmeans.deciders import CacheMiss, Decisions, request_key
 from dmeans.metrics import accuracy
 
-from .semantic import RESULTS
+from .semantic import MODEL, RESULTS
 
 log = _log.get("bench.convergence")
 OUT = RESULTS / "convergence.json"
@@ -113,12 +113,12 @@ class SimulatedDecider:
 
 
 # --- curves -----------------------------------------------------------------------------------
-def _real(name: str, live: bool) -> tuple[dict, Jev]:
+def _real(name: str, live: bool) -> tuple[dict, Decisions]:
     from . import data, embed
 
     ds = data.load(name)
     prob = {"x": embed.embed(name, ds.texts), "texts": ds.texts, "labels": ds.labels, "k": ds.k, "about": ds.about}
-    return prob, Jev(ANSWERS, offline=not live)
+    return prob, Decisions(MODEL, ANSWERS, offline=not live)
 
 
 def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:

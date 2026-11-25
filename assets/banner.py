@@ -1,4 +1,4 @@
-"""Render the README banner: three smooth spheres (k = 3) next to the D-means wordmark.
+"""Render three clusters of data points next to the D-means wordmark.
 
     uv run python assets/banner.py          # writes d-means-banner.png and d-means-banner-dark.png
     uv run python assets/banner.py OUTDIR   # writes them into OUTDIR instead
@@ -25,15 +25,38 @@ LOG = _log.get("banner")
 W, H, SS = 1536, 512, 3  # output size and supersampling per axis
 WORDMARK_AT = (773, 206)  # top-left of assets/wordmark.png on the banner
 
-# One sphere per cluster: (material, x, z, radius). They rest on the floor y = 0, a hair apart.
-SPHERES = (
-    ("ivory", 0.10, -1.00, 1.00),
-    ("black", -0.95, 0.68, 0.88),
-    ("silver", 1.17, 0.53, 0.78),
+# Each cluster starts with its centroid sphere, followed by its member spheres.
+# Positions are (x, z, radius), with all spheres resting on the floor.
+CLUSTERS = (
+    ("amber", (
+        (0.05, -1.62, 0.55),
+        (-0.96, -2.06, 0.16),
+        (0.48, -3.90, 0.20),
+        (0.98, -1.90, 0.15),
+        (0.68, -1.07, 0.19),
+        (-0.39, -0.93, 0.17),
+    )),
+    ("teal", (
+        (-1.78, 0.82, 0.57),
+        (-2.67, 0.52, 0.18),
+        (-2.48, -1.09, 0.15),
+        (-0.90, 0.66, 0.19),
+        (-1.39, 1.62, 0.17),
+        (-2.30, 1.58, 0.20),
+    )),
+    ("violet", (
+        (1.78, 1.04, 0.53),
+        (0.88, 0.96, 0.15),
+        (2.46, -1.20, 0.18),
+        (2.77, 0.58, 0.16),
+        (2.39, 1.73, 0.19),
+        (1.26, 1.84, 0.17),
+    )),
 )
+SPHERES = tuple((material, *point) for material, points in CLUSTERS for point in points)
 
 # Studio camera: eye, target, focal length (px) and where the target lands on the banner.
-EYE, TARGET, FOCAL, CENTER = (0.0, 4.0, 10.0), (0.1, 0.7, 0.0), 1100.0, (380.0, 262.0)
+EYE, TARGET, FOCAL, CENTER = (0.0, 7.0, 10.0), (0.0, 0.25, 0.0), 1120.0, (373.0, 263.0)
 
 KEY = np.array([-0.55, 1.0, 0.35]) / np.linalg.norm([-0.55, 1.0, 0.35])  # softbox, upper left
 KEY_RADIUS = 0.42  # angular radius (rad) of the softbox: wide, soft shadows
@@ -59,9 +82,9 @@ THEMES = {
 
 # Linear albedo / F0 and roughness per material.
 MATERIALS = {
-    "ivory": dict(albedo=(0.80, 0.75, 0.65), f0=0.04, rough=0.42, wrap=0.35),
-    "black": dict(albedo=(0.018, 0.018, 0.020), f0=0.045, rough=0.34, wrap=0.0),
-    "silver": dict(albedo=(0.0, 0.0, 0.0), f0=(0.90, 0.91, 0.92), rough=0.40, wrap=0.0),
+    "amber": dict(albedo=(0.83, 0.36, 0.075), f0=0.04, rough=0.42, wrap=0.32),
+    "teal": dict(albedo=(0.035, 0.46, 0.38), f0=0.04, rough=0.42, wrap=0.32),
+    "violet": dict(albedo=(0.31, 0.16, 0.65), f0=0.04, rough=0.42, wrap=0.32),
 }
 
 
@@ -246,6 +269,18 @@ class Camera:
         d = (px[..., None] - CENTER[0]) / FOCAL * self.right - (py[..., None] - CENTER[1]) / FOCAL * self.up
         return np.broadcast_to(self.eye, d.shape), norm(d + self.fwd)
 
+    def sphere_bounds(self, centers, radii):
+        """Pixel bounds containing all projected spheres, from their camera-space boxes."""
+        view = centers - self.eye
+        offsets = radii[:, None] * np.array([-1, 1])
+        depth = (view @ self.fwd)[:, None] + offsets
+        x = CENTER[0] + FOCAL * ((view @ self.right)[:, None] + offsets)[:, :, None] / depth[:, None, :]
+        y = CENTER[1] - FOCAL * ((view @ self.up)[:, None] + offsets)[:, :, None] / depth[:, None, :]
+        return (
+            max(0, int(np.floor(x.min()))), min(W, int(np.ceil(x.max()))),
+            max(0, int(np.floor(y.min()))), min(H, int(np.ceil(y.max()))),
+        )
+
 
 def shade(px, py, cam, t, centers, radii):
     """Linear radiance of the rays through banner positions (px, py)."""
@@ -278,15 +313,18 @@ def render(theme: str = "light") -> np.ndarray:
     col = np.zeros((H, W, 3))
     edge = np.zeros((H, W), bool)
     offs = (np.arange(SS) + 0.5) / SS
+    left, right, top, bottom = cam.sphere_bounds(centers, radii)
+    sx = (np.arange(left, right)[:, None] + offs).reshape(-1)
     rows = 64
     for y0 in range(0, H, rows):
         py, px = np.mgrid[y0: y0 + rows, 0:W] + 0.5
         col[y0: y0 + rows] = shade(px, py, cam, t, centers, radii)
-        sy = (np.arange(y0, y0 + rows)[:, None] + offs).reshape(-1)
-        sx = (np.arange(W)[:, None] + offs).reshape(-1)
-        o, d = cam.rays(*np.meshgrid(sx, sy)[::1])
-        idx = hit_spheres(o, d, centers, radii)[1].reshape(rows, SS, W, SS)
-        edge[y0: y0 + rows] = idx.min(axis=(1, 3)) != idx.max(axis=(1, 3))
+        start, end = max(y0, top), min(y0 + rows, bottom)
+        if start < end:
+            sy = (np.arange(start, end)[:, None] + offs).reshape(-1)
+            o, d = cam.rays(*np.meshgrid(sx, sy))
+            idx = hit_spheres(o, d, centers, radii)[1].reshape(end - start, SS, right - left, SS)
+            edge[start:end, left:right] = idx.min(axis=(1, 3)) != idx.max(axis=(1, 3))
     ey, ex = np.nonzero(edge)
     sub_x = (ex[:, None, None] + offs[None, None, :]) * np.ones((1, SS, 1))
     sub_y = (ey[:, None, None] + offs[None, :, None]) * np.ones((1, 1, SS))

@@ -26,7 +26,7 @@ k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://githu
 | TREC | 500 | 6 | 55.6 | 58.1 | 58.1 | **65.9** | +7.8 | $0.004 |
 | StackExchange | 3,000 | 50 | 37.6 | 33.7 | 34.8 | **42.3** | +4.7 | $0.033 |
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the best baseline. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed).
+Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the best baseline. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed). Every d-means number comes from real Jev 1.14 answers through OpenRouter (8,866 decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz)).
 
 <details><summary>NMI and ARI</summary>
 
@@ -111,15 +111,8 @@ Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by an
 ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
 
-### Where d-means loses
-
 <!-- bench:diagnose -->
-| Dataset | best baseline | micro-cluster purity | geometric merge | Jev merge | after settle | Noul AUC | settle moves right / wrong |
-|:--|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 58.1 | - | 59.5 | 62.3 | 65.9 | - | - |
-| StackExchange | 37.6 | - | 35.9 | 38.9 | 42.3 | - | - |
 
-ACC (%) after each stage of a default run, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. *Noul AUC* ranks Jev's p(same) on the asked pairs against "same majority class" (0.5 is chance). *Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run.
 <!-- /bench:diagnose -->
 
 The same micro-clusters merged by geometry alone gain little. The decisions carry the gain, and each stage adds to it.

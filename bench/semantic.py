@@ -30,7 +30,7 @@ log = _log.get("bench.semantic")
 RESULTS = Path(__file__).resolve().parent / "results"
 ANSWERS = RESULTS / "jev-answers.jsonl.gz"
 OUT = RESULTS / "semantic.json"
-DATASETS = ["trec", "stackexchange", "ag-news", "bbc-news", "20-newsgroups", "banking77"]  # all measured live
+DATASETS = ["trec", "stackexchange", "ag-news", "bbc-news", "20-newsgroups", "banking77"]  # every loader in bench/data.py
 SEEDS = [0, 1, 2]
 BASELINES = ["k-means", "e-means", "o-means"]
 # Cost per Jev decision measured on the live runs (OpenRouter usage.cost / API calls, Jev 1.14).
@@ -49,6 +49,12 @@ ABLATIONS = {
     "10 merge neighbours": {"neighbors": 10},
     "spectral merge": {"linkage": "spectral"},
 }
+
+
+def committed() -> list[str]:
+    """Datasets in results/semantic.json, in DATASETS order: what replay and --verify cover by default."""
+    got = json.loads(OUT.read_text())["datasets"] if OUT.exists() else {}
+    return [d for d in DATASETS if d in got] or DATASETS
 
 
 def geometric_merge(x: np.ndarray, k: int, seed: int, over: int = 3) -> np.ndarray:
@@ -189,7 +195,7 @@ def table(result: dict) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--datasets", default=",".join(DATASETS))
+    ap.add_argument("--datasets", default=None, help=f"comma-separated, from {','.join(DATASETS)} (default: the committed ones)")
     ap.add_argument("--seeds", default=",".join(map(str, SEEDS)))
     ap.add_argument("--live", action="store_true", help="call Jev for answers missing from the cache")
     ap.add_argument("--write", action="store_true", help="save results/semantic.json and prune the answer cache")
@@ -199,7 +205,8 @@ def main(argv: list[str] | None = None) -> int:
     _log.setup()
     jev = Jev(ANSWERS, offline=not a.live)
     try:
-        result = run(a.datasets.split(","), [int(s) for s in a.seeds.split(",")], jev, ablations=not a.no_ablations)
+        names = a.datasets.split(",") if a.datasets else committed()
+        result = run(names, [int(s) for s in a.seeds.split(",")], jev, ablations=not a.no_ablations)
     except CacheMiss as e:
         log.error("Jev answer %s is not in %s; run with --live to ask Jev", e, ANSWERS)
         return 2

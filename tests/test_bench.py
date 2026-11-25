@@ -91,6 +91,8 @@ def test_summary_names_every_loss():
 def test_readme_explains_each_dataset_d_means_loses_on():
     res = json.loads((semantic.OUT).read_text())
     readme = (ROOT / "README.md").read_text()
+    if not any(semantic.losses(res).values()):
+        return
     section = readme.split("### Where d-means loses", 1)[1].split("\n## ", 1)[0]
     prose = re.sub(r"<!-- bench:diagnose -->.*?<!-- /bench:diagnose -->", "", section, flags=re.S)
     for name, lost in semantic.losses(res).items():

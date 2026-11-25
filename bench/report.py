@@ -5,12 +5,13 @@
 """
 
 import argparse
+import gzip
 import json
 import re
 import sys
 from pathlib import Path
 
-from .semantic import BASELINES, RESULTS, losses
+from .semantic import ANSWERS, BASELINES, RESULTS, losses
 
 README = Path(__file__).resolve().parent.parent / "README.md"
 NAMES = {
@@ -71,6 +72,9 @@ def summary(res: dict) -> str:
     if trails:
         out += f" It trails on {_and(trails)}; [why](#where-d-means-loses)."
     n = res.get("jev_answers")
+    if n is None and ANSWERS.exists():
+        with gzip.open(ANSWERS, "rt") as f:
+            n = sum(1 for _ in f)
     if n:
         out += f" Every d-means number comes from real Jev 1.14 answers through OpenRouter ({n:,} decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz))."
     return out
@@ -122,6 +126,9 @@ def ablation_table(res: dict) -> str:
 
 
 def diagnose_table(res: dict) -> str:
+    """The "Where d-means loses" section; empty until a live run has recorded stage diagnostics."""
+    if not any("purity" in r["mean"]["d-means"] for r in res["datasets"].values()):
+        return ""
     rows = [
         "| Dataset | best baseline | micro-cluster purity | geometric merge | Jev merge | after settle | Noul AUC | settle moves right / wrong |",
         "|:--|--:|--:|--:|--:|--:|--:|--:|",
@@ -141,7 +148,7 @@ def diagnose_table(res: dict) -> str:
             moves,
         ]
         rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
-    return "\n".join(rows) + (
+    return "### Where d-means loses\n\n" + "\n".join(rows) + (
         "\n\nACC (%) after each stage of a default run, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. "
         "*Noul AUC* ranks Jev's p(same) on the asked pairs against \"same majority class\" (0.5 is chance). "
         "*Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run."

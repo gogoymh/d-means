@@ -8,9 +8,9 @@ import numpy as np
 import pytest
 from test_dmeans import corpus  # noqa: F401  (fixture)
 
-from dmeans import LLM, DMeans
+from dmeans import DMeans
 from dmeans import deciders as decmod
-from dmeans.deciders import CacheMiss, FunctionDecider, coerce
+from dmeans.deciders import LLM, CacheMiss, FunctionDecider, coerce
 from dmeans.metrics import accuracy
 
 REQ = {

@@ -25,9 +25,9 @@ import time
 
 import numpy as np
 
-from dmeans import DMeans, EMeans, Jev, OMeans, _log, lloyd
+from dmeans import DMeans, EMeans, OMeans, _log, lloyd
 from dmeans.geometry import nearest
-from dmeans.jev import CacheMiss, request_key
+from dmeans.deciders import CacheMiss, Jev, request_key
 from dmeans.metrics import accuracy
 
 from .semantic import RESULTS

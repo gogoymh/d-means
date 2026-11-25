@@ -4,20 +4,20 @@ Geometry is good at "how far", bad at "what kind". k-means, e-means and o-means 
 embedding space by distance alone, so they merge two categories that sit close together and
 split one that is spread out, and they guess on points that sit between two centroids.
 d-means keeps the fast geometry and hands the two decisions geometry cannot make to a
-decision model (Jev), which reads the texts:
+decision model (any `ask(requests) -> answers`, see dmeans.deciders), which reads the texts:
 
 1. Over-cluster. e-means splits the data into `over * k` micro-clusters, which are much purer
    than k clusters.
-2. Merge by decision. For each micro-cluster and its nearest neighbours, Jev answers a Noul:
+2. Merge by decision. For each micro-cluster and its nearest neighbours, the decider answers a Noul:
    do these two groups share one topic? Pairs it was not asked about get a prior fitted on
    the pairs it was asked about (isotonic in centroid cosine). Average-linkage on 1 - p joins
    the micro-clusters into exactly k groups.
 3. Settle the borderline points. The `budget` share of points with the smallest margin between
-   their two nearest groups get a Choice question over their nearest `candidates` groups. Jev's
+   their two nearest groups get a Choice question over their nearest `candidates` groups. The decider's
    probabilities are multiplied with the geometric posterior and the point takes the argmax.
 
-Every call goes through a decider with `ask(requests) -> answers` (see dmeans.deciders): Jev, any
-chat LLM, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
+Every call goes through a decider with `ask(requests) -> answers` (see dmeans.deciders): any
+chat LLM, Jev, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
 so the algorithm is tested offline with a scripted decider and replayed offline from cached answers.
 """
 
@@ -157,7 +157,7 @@ class DMeans:
         reqs, opts = [], []
         for i in ask:
             cand = [int(g) for g in np.argsort(gd[i])[:m] if np.isfinite(gd[i, g])]
-            cand = [cand[j] for j in rng.permutation(len(cand))]  # Jev is sensitive to option order
+            cand = [cand[j] for j in rng.permutation(len(cand))]  # decision models are sensitive to option order
             names = cards.option_names(group_cards, cand)
             opts.append((cand, names))
             reqs.append(

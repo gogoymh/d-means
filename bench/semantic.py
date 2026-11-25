@@ -19,9 +19,9 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import roc_auc_score
 
-from dmeans import DMeans, EMeans, Jev, OMeans, _log
+from dmeans import DMeans, EMeans, OMeans, _log
 from dmeans.geometry import nearest
-from dmeans.jev import CacheMiss
+from dmeans.deciders import CacheMiss, Jev
 from dmeans.metrics import accuracy, scores
 
 from . import data, embed

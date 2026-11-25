@@ -6,10 +6,13 @@ d-means asks typed questions and needs answers back in one compact shape:
     answer  = {qid: float in [0, 1]}            for a Noul (probability the statement is true)
               {qid: {option: probability}}      for a Choice (options are the keys of `criteria`)
 
-Anything with `ask(requests) -> answers` is a decider. Three come built in:
+Anything with `ask(requests) -> answers` is a decider. d-means depends on none of them by name;
+these come built in, side by side:
 
-- `Jev` (dmeans.jev): TypeSafe's System One decision model through OpenRouter's Decisions API.
+    from dmeans.deciders import LLM, Jev
+
 - `LLM`: any chat model behind an OpenAI-compatible endpoint (OpenRouter, OpenAI, vLLM, Ollama, ...).
+- `Jev`: TypeSafe's System One decision model through OpenRouter's Decisions API.
 - A plain function `fn(state, question) -> answer`, wrapped by `as_decider`.
 
 `CachedDecider` gives every remote model the same cache, offline replay and concurrency.
@@ -34,6 +37,7 @@ from . import _log
 
 log = _log.get("deciders")
 RETRY_CODES = (408, 429, 500, 502, 503, 504)
+__all__ = ["Decider", "CachedDecider", "FunctionDecider", "LLM", "Jev", "CacheMiss", "as_decider", "coerce", "normalize", "request_key"]
 
 
 class CacheMiss(KeyError):
@@ -340,3 +344,30 @@ class LLM(CachedDecider):
                 log.warning("LLM %s gave an unusable reply (attempt %d): %s", self.model, attempt + 1, e)
         raise RuntimeError(f"LLM {self.model} gave no usable answer after {self.repairs + 1} tries: {err}")
 
+
+
+# --- Jev, TypeSafe's typed decision model -----------------------------------------------------
+JEV_URL = "https://openrouter.ai/api/alpha/decisions"
+JEV_MODEL = "typesafe/jev-1.14"
+
+
+def _jev_compact(answers: dict) -> dict:
+    out = {}
+    for qid, a in answers.items():
+        if a.get("type") == "noul":
+            out[qid] = round(float(a["noul"]), 4)
+        else:
+            out[qid] = {o: round(float(p), 4) for o, p in a["probabilities"].items()}
+    return out
+
+
+class Jev(CachedDecider):
+    """Jev through OpenRouter's Decisions API, which answers typed questions natively (no prompt)."""
+
+    label = "Jev"
+
+    def __init__(self, cache: str | Path | None = None, offline: bool = False, model: str = JEV_MODEL, workers: int = 16):
+        super().__init__(model, cache, offline, workers)
+
+    def _call(self, req: dict) -> dict:
+        return _jev_compact(self._post(JEV_URL, {"model": self.model, **req}, "OPENROUTER_API_KEY")["answers"])

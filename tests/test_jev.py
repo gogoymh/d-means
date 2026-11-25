@@ -6,8 +6,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from dmeans import jev as jevmod
-from dmeans.jev import CacheMiss, Jev
+from dmeans import deciders as jevmod
+from dmeans.deciders import CacheMiss, Jev
 
 
 class Fake(BaseHTTPRequestHandler):
@@ -45,7 +45,7 @@ class Fake(BaseHTTPRequestHandler):
 def server(monkeypatch):
     srv = HTTPServer(("127.0.0.1", 0), Fake)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    monkeypatch.setattr(jevmod, "URL", f"http://127.0.0.1:{srv.server_port}/api/alpha/decisions")
+    monkeypatch.setattr(jevmod, "JEV_URL", f"http://127.0.0.1:{srv.server_port}/api/alpha/decisions")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(jevmod.time, "sleep", lambda s: None)
     Fake.calls, Fake.fail_next = [], []

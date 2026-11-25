@@ -1,4 +1,6 @@
-<h1 align="center">d-means</h1>
+<h1 align="center">
+  <img src="assets/d-means-banner.png" alt="D-means" width="960">
+</h1>
 
 <p align="center">
   <b>k-means that asks before it guesses.</b><br>

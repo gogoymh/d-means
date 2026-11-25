@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from bench import chart, convergence as cv
-from bench.report import ASSETS, charts
+from bench.report import ASSETS, README, charts, reach_sentence
 from dmeans.dmeans import assign_question, merge_question
 
 NS = "{http://www.w3.org/2000/svg}"
@@ -20,15 +20,36 @@ def committed():
 
 def test_fastest_d_means_reaches_target_in_fewest_epochs(committed):
     assert committed["problems"], "no problem in results/convergence.json"
-    assert cv.fastest_problems(committed) == list(committed["problems"])
+    synthetic = [n for n, p in committed["problems"].items() if p["source"] == "synthetic"]
+    assert synthetic and set(synthetic) <= set(cv.fastest_problems(committed))
+    for name in synthetic:
+        p = committed["problems"][name]
+        reach = p["epochs_to_target"]
+        assert all(reach[m] is None or reach["d-means"] < reach[m] for m in cv.BASELINES)
+        assert p["mean"]["d-means"][0] >= p["target"]["acc"]  # already past it at the smallest budget
+
+
+def test_summary_follows_from_per_seed_accuracy(committed):
     for p in committed["problems"].values():
         runs = [{"acc": {m: p["acc"][m][i] for m in cv.METHODS}, "epochs": p["epochs"], "passes": p["passes"], "decisions_per_point": [p["decisions_per_point"]]} for i in range(len(p["seeds"]))]
         again = cv.summarize(runs)  # the stored summary follows from the stored per-seed accuracies
         assert again["target"] == p["target"] and again["epochs_to_target"] == p["epochs_to_target"]
         assert all(again["mean"][m] == pytest.approx(p["mean"][m]) for m in cv.METHODS)
-        reach = p["epochs_to_target"]
-        assert all(reach[m] is None or reach["d-means"] < reach[m] for m in cv.BASELINES)
-        assert p["mean"]["d-means"][0] >= p["target"]["acc"]  # already past it at the smallest budget
+
+
+def test_readme_states_whether_d_means_reaches_target_first_on_real_data(committed):
+    real = {n: p for n, p in committed["problems"].items() if p["source"] != "synthetic"}
+    assert {"trec", "stackexchange"} <= set(real), "no live Jev curves for TREC and StackExchange"
+    text = README.read_text()
+    fastest = set(cv.fastest_problems(committed))
+    for name, p in real.items():
+        assert p["decider"] == "typesafe/jev-1.14" and p["seeds"] == [0, 1, 2]
+        alt, verdict = reach_sentence(p)
+        assert f'{chart.TITLE}: {alt}" src="assets/convergence-{name}-light.svg"' in text
+        assert verdict in text
+        first = name in fastest
+        assert ("sooner than the fastest baseline" in verdict) == first
+        assert (", not first" in alt or "never" in alt) == (not first)
 
 
 @pytest.fixture(scope="module")

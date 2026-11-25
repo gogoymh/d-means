@@ -32,8 +32,15 @@ def _f(v: float) -> str:
     return f"{v:.1f}"
 
 
+NAMES = {"synthetic": "Synthetic topics", "trec": "TREC", "stackexchange": "StackExchange", "ag-news": "AG News", "bbc-news": "BBC News", "20-newsgroups": "20 Newsgroups", "banking77": "Banking77"}
+
+
+def decider(p: dict) -> str:
+    return "Jev 1.14" if p["decider"] == "typesafe/jev-1.14" else p["decider"]
+
+
 def name(p: dict) -> str:
-    return "Synthetic topics" if p["source"] == "synthetic" else p["source"]
+    return NAMES.get(p["source"], p["source"])
 
 
 def svg(p: dict, theme: str = "light") -> str:
@@ -53,7 +60,7 @@ def svg(p: dict, theme: str = "light") -> str:
 
     seeds = len(p["acc"]["d-means"])
     reach = p["epochs_to_target"]
-    sub = f"{name(p)}, n={p['n']:,}, k={p['k']}. Mean of {seeds} seeds. Decisions: {p['decider']}, {p['decisions_per_point']:.2f} per point."
+    sub = f"{name(p)}, n={p['n']:,}, k={p['k']}. Mean of {seeds} seeds. Decisions: {decider(p)}, {p['decisions_per_point']:.2f} per point."
     desc = (
         f"Mean clustering accuracy against passes over the data. The best baseline ends at {target:.1f}% ({p['target']['method']}). "
         "Epochs needed to reach it: " + ", ".join(f"{m} {'never' if reach[m] is None else f'{reach[m]:.3g}'}" for m in LEGEND) + "."
@@ -95,10 +102,14 @@ def svg(p: dict, theme: str = "light") -> str:
         o.append(f'<g data-method="{m}"><path d="{d}" fill="none" stroke="{col}" stroke-width="{wid}" stroke-linejoin="round" stroke-linecap="round"/>')
         o += [f'<circle cx="{_f(sx(x))}" cy="{_f(sy(y))}" r="{r}" fill="{col}" stroke="{c["surface"]}" stroke-width="2"/>' for x, y in pts[m]]
         o.append("</g>")
-    # direct labels on the story only: where d-means clears the target, and where it ends
-    fx, fy = pts["d-means"][0]
+    # direct labels on the story only: where d-means reaches the target (a guide from the top), and where it ends
     if reach["d-means"] is not None:
-        o.append(f'<text x="{_f(sx(fx) - 4)}" y="{_f(sy(fy) + 24)}" class="k">Clears it after {reach["d-means"]:.2g} epochs</text>')
+        fx = reach["d-means"]
+        fy = dict(pts["d-means"])[fx]
+        gx, right = sx(fx), sx(fx) > (LEFT + W - RIGHT) / 2
+        o.append(f'<line x1="{_f(gx)}" y1="{TOP + 6}" x2="{_f(gx)}" y2="{_f(sy(fy) - 8)}" stroke="{c["ink"]}" stroke-width="1" stroke-dasharray="3 3"/>')
+        anchor = ' text-anchor="end"' if right else ""
+        o.append(f'<text x="{_f(gx - 6 if right else gx + 6)}" y="{TOP + 14}" class="k"{anchor}>d-means reaches it at {reach["d-means"]:.3g} epochs</text>')
     ex, ey = pts["d-means"][-1]
     o.append(f'<text x="{_f(sx(ex) + 10)}" y="{_f(sy(ey) + 4)}" class="k n">{ey:.1f}%</text>')
     o.append("</svg>")

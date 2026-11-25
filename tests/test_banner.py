@@ -1,7 +1,6 @@
-"""The README banner: three smooth spheres, light and dark variants, rebuilt by assets/banner.py."""
+"""The README banner: three clusters in light and dark variants."""
 
 import importlib.util
-import itertools
 import re
 from pathlib import Path
 
@@ -27,33 +26,32 @@ def luma(img):
     return img.astype(float) @ [0.2126, 0.7152, 0.0722]
 
 
-def bead_metrics(img):
-    """Strong-edge pixels and bright highlight peaks in the object half of the banner.
-
-    The beaded banner (f6e67ff) scores 22,143 edge pixels and 69 peaks: every bead adds an
-    outline and a highlight. Three smooth spheres score about 5,000 and 13.
-    """
-    g = luma(img)[:, :700]
-    edges = int((np.hypot(ndimage.sobel(g, 1), ndimage.sobel(g, 0)) > 60).sum())
-    blur = ndimage.gaussian_filter(g, 2)
-    peaks = (blur == ndimage.maximum_filter(blur, 15)) & (blur - ndimage.minimum_filter(blur, 31) > 25)
-    return edges, ndimage.label(peaks)[1]
-
-
-def test_scene_is_three_large_spheres_apart():
-    centers, radii = banner.spheres()
-    assert len(radii) == 3
-    assert radii.min() >= 0.7 * radii.max()  # no small beads
-    assert np.allclose(centers[:, 1], radii)  # each rests on the floor
-    for i, j in itertools.combinations(range(3), 2):
-        assert np.linalg.norm(centers[i] - centers[j]) > radii[i] + radii[j]  # none sink into another
-
-
 @pytest.mark.parametrize("theme", BANNERS)
-def test_banner_has_no_beads(theme):
-    edges, peaks = bead_metrics(load(theme))
-    assert edges <= 8_000, edges
-    assert peaks <= 20, peaks
+def test_scene_shows_three_separated_clusters(theme):
+    img = load(theme)
+    saturated = np.ptp(img, axis=2) >= 24
+    assert not saturated[:, banner.WORDMARK_AT[0]:].any()
+    dominant = img.argmax(axis=2)
+    centroids, members = [], []
+
+    # The neutral studio backdrop falls below the saturation threshold. Amber, teal and
+    # violet have different dominant channels, so each sphere is measurable in the PNG.
+    for channel in range(3):
+        labels, count = ndimage.label(saturated & (dominant == channel))
+        areas = np.bincount(labels.ravel())[1:]
+        visible = np.flatnonzero(areas >= 40) + 1
+        assert len(visible) == 6, (theme, channel, count, areas)
+        order = visible[np.argsort(areas[visible - 1])[::-1]]
+        assert areas[order[0] - 1] >= 4 * areas[order[1] - 1]
+        center, *points = ndimage.center_of_mass(saturated, labels, order)
+        points = np.array(points)
+        assert np.all(points.min(axis=0) < center)
+        assert np.all(points.max(axis=0) > center)
+        centroids.append(center)
+        members.append(points)
+
+    distances = np.linalg.norm(np.array(members)[:, :, None] - np.array(centroids), axis=-1)
+    assert np.array_equal(distances.argmin(axis=-1), np.repeat(np.arange(3)[:, None], 5, axis=1))
 
 
 def test_readme_shows_dark_and_light_banners():

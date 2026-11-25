@@ -21,7 +21,7 @@
 
 k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
 
-**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to [Jev](https://docs.typesafe.ai), TypeSafe's System One decision model, which reads the texts and answers typed questions with calibrated probabilities.
+**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: any chat LLM, your own function, or [Jev](https://docs.typesafe.ai), TypeSafe's System One model, which ran the benchmark below.
 
 <!-- bench:semantic -->
 | Dataset | n | k | k-means | e-means | o-means | **d-means** | vs best | Jev cost / run |
@@ -66,7 +66,8 @@ export OPENROUTER_API_KEY=sk-or-...
 ```
 
 ```python
-from dmeans import DMeans, Jev
+from dmeans import DMeans
+from dmeans.deciders import Jev    # or LLM, or your own function
 
 model = DMeans(k=6, decider=Jev(cache="answers.jsonl.gz"),
                about="type of answer the question asks for")
@@ -85,10 +86,11 @@ centroids, labels = OMeans(k=8192, nepochs=2).fit(x)   # two-level assignment
 
 ### Bring your own decision model
 
-Jev is the default, not a requirement. `decider` takes any of three things:
+d-means is tied to no model. Every decision model sits in `dmeans.deciders`, side by side, and `decider` takes any of them:
 
 ```python
-from dmeans import DMeans, Jev, LLM
+from dmeans import DMeans
+from dmeans.deciders import LLM, Jev
 
 DMeans(k, decider=Jev())                                      # TypeSafe Jev, Decisions API
 DMeans(k, decider=LLM("openai/gpt-5-mini"))                   # any chat model on OpenRouter
@@ -107,7 +109,7 @@ uv run python -m bench.semantic --verify   # offline replay of the committed Jev
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
-uv run pytest                              # 33 offline tests, about 10 s
+uv run pytest                              # 40 offline tests, about 10 s
 ```
 
 Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent are pinned and wait for a live run. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
@@ -204,7 +206,7 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 ## Fine print
 
 - d-means takes one input the baselines cannot: `about`, a few words that name the grouping ("news topic", "customer request"). Distance has no way to know you mean answer type rather than subject. No label names go in.
-- It needs something Jev can read for each point. On bare vectors use `EMeans` or `OMeans`.
+- It needs something the decision model can read for each point. On bare vectors use `EMeans` or `OMeans`.
 - It optimizes agreement with human categories, not squared error. Its engine is e-means, so it keeps e-means' speed.
 - Measured on two datasets so far. The other four load from pinned files in `bench/data.py`; their live run (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new Jev decisions, an estimated $1 to $2.
 - Replay rebuilds the exact requests, so it needs the embeddings in `.cache/emb`. A fresh clone re-embeds through OpenRouter on the first run.

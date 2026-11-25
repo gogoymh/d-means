@@ -16,8 +16,9 @@ decision model (Jev), which reads the texts:
    their two nearest groups get a Choice question over their nearest `candidates` groups. Jev's
    probabilities are multiplied with the geometric posterior and the point takes the argmax.
 
-Every call goes through a decider with `ask(requests) -> answers`, so the algorithm is tested
-offline with a scripted decider and replayed offline from Jev's cached answers.
+Every call goes through a decider with `ask(requests) -> answers` (see dmeans.deciders): Jev, any
+chat LLM, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
+so the algorithm is tested offline with a scripted decider and replayed offline from cached answers.
 """
 
 import numpy as np
@@ -25,6 +26,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.isotonic import IsotonicRegression
 
 from . import _log, cards
+from .deciders import as_decider, normalize
 from .emeans import EMeans
 from .geometry import nearest, sqdist
 
@@ -71,6 +73,11 @@ class DMeans:
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed
         self.linkage, self.fusion = linkage, fusion
+        self.decider = as_decider(decider)
+        log.info("d-means decider: %s %s", type(self.decider).__name__, getattr(self.decider, "model", ""))
+
+    def _ask(self, reqs: list[dict]) -> list[dict]:
+        return normalize(reqs, self.decider.ask(reqs)) if reqs else []
 
     # --- stage 1 ---------------------------------------------------------------------------
     def _micro(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -103,7 +110,7 @@ class DMeans:
             }
             for i, j in pairs
         ]
-        ans = self.decider.ask(reqs)
+        ans = self._ask(reqs)
         p_same = np.array([float(a["same"]) for a in ans])
         unit = mc / np.maximum(np.linalg.norm(mc, axis=1, keepdims=True), 1e-12)
         cos = unit @ unit.T
@@ -159,7 +166,7 @@ class DMeans:
                     "questions": {"group": assign_question(self.about, {nm: group_cards[g] for nm, g in zip(names, cand)})},
                 }
             )
-        ans = self.decider.ask(reqs)
+        ans = self._ask(reqs)
         out = labels.copy()
         changed = 0
         for i, (cand, names), a in zip(ask, opts, ans):

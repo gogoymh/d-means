@@ -1,7 +1,7 @@
-"""Render the README benchmark tables from results/*.json.
+"""Render the README benchmark tables and the convergence charts from results/*.json.
 
-    uv run python -m bench.report          # rewrite the tables in README.md
-    uv run python -m bench.report --check  # fail if README.md is out of date
+    uv run python -m bench.report          # rewrite the tables in README.md and the SVGs in assets/
+    uv run python -m bench.report --check  # fail if README.md or a chart is out of date
 """
 
 import argparse
@@ -10,9 +10,11 @@ import re
 import sys
 from pathlib import Path
 
+from . import chart
 from .semantic import BASELINES, RESULTS
 
 README = Path(__file__).resolve().parent.parent / "README.md"
+ASSETS = README.parent / "assets"
 NAMES = {"trec": "TREC", "stackexchange": "StackExchange"}
 
 
@@ -68,11 +70,53 @@ def mse_table(res: dict) -> str:
     return "\n".join(rows)
 
 
+def convergence_block(res: dict) -> str:
+    parts = []
+    for prob, p in res["problems"].items():
+        img = f"assets/convergence-{prob}"
+        target, reach = p["target"], p["epochs_to_target"]
+        cols = [p["epochs"]["d-means"][0], 1, p["epochs"]["d-means"][-1]]
+        head = "| Method | " + " | ".join(f"ACC at {chart.frac(t)} epoch{'s' if t > 1 else ''}" for t in cols) + f" | Epochs to reach {100 * target['acc']:.1f}% |"
+        rows = [head, "|:--|" + "--:|" * (len(cols) + 1)]
+        at = {m: dict(zip(p["epochs"][m], p["mean"][m])) for m in p["mean"]}
+        fastest = min(v for v in reach.values() if v is not None)
+        for m in at:
+            cells = []
+            for t in cols:
+                best = max(a.get(t, 0.0) for a in at.values())
+                cells.append("-" if t not in at[m] else (f"**{_pct(at[m][t])}**" if at[m][t] == best else _pct(at[m][t])))
+            r = reach[m]
+            cells.append("never" if r is None else (f"**{r:.2g}**" if r == fastest else f"{r:.2g}"))
+            rows.append(f"| {'**d-means**' if m == 'd-means' else m} | " + " | ".join(cells) + " |")
+        base = min((reach[m], m) for m in BASELINES if reach[m] is not None)
+        alt = f"{chart.TITLE}: d-means clears the best baseline's final accuracy after {reach['d-means']:.2g} epochs"
+        parts.append(
+            f'<picture>\n  <source media="(prefers-color-scheme: dark)" srcset="{img}-dark.svg">\n'
+            f'  <img alt="{alt}" src="{img}-light.svg" width="100%">\n</picture>\n\n'
+            + "\n".join(rows)
+            + f"\n\n{chart.name(p)}, mean of {len(p['acc']['d-means'])} seeds. The best baseline ends at {100 * target['acc']:.1f}% "
+            f"({target['method']}, {chart.frac(target['epochs'])} epochs). d-means passes it at its first budget, {reach['d-means']:.2g} epochs, "
+            f"at least {base[0] / reach['d-means']:.0f}x sooner than the fastest baseline gets there ({base[1]}, {base[0]:.2g} epochs)."
+        )
+    return "\n\n".join(parts)
+
+
+def charts() -> dict[Path, str]:
+    """SVG files for every problem in results/convergence.json, light and dark."""
+    path = RESULTS / "convergence.json"
+    if not path.exists():
+        return {}
+    res = json.loads(path.read_text())
+    return {ASSETS / f"convergence-{prob}-{theme}.svg": chart.svg(p, theme) for prob, p in res["problems"].items() for theme in chart.THEMES}
+
+
 def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
     blocks = {"semantic": semantic_table(sem), "ablation": ablation_table(sem)}
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
+    if (RESULTS / "convergence.json").exists():
+        blocks["convergence"] = convergence_block(json.loads((RESULTS / "convergence.json").read_text()))
     for name, body in blocks.items():
         pat = re.compile(rf"(<!-- bench:{name} -->\n).*?(<!-- /bench:{name} -->)", re.S)
         if not pat.search(text):
@@ -87,14 +131,19 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     old = README.read_text()
     new = render(old)
+    svgs = charts()
     if a.check:
-        if old != new:
-            print("README.md benchmark tables are out of date; run: uv run python -m bench.report", file=sys.stderr)
+        stale = (["README.md"] if old != new else []) + [f.name for f, body in svgs.items() if not f.exists() or f.read_text() != body]
+        if stale:
+            print(f"out of date: {', '.join(stale)}; run: uv run python -m bench.report", file=sys.stderr)
             return 1
-        print("README.md benchmark tables match bench/results")
+        print(f"README.md tables and {len(svgs)} charts match bench/results")
         return 0
     README.write_text(new)
-    print("README.md tables updated")
+    for f, body in svgs.items():
+        f.parent.mkdir(exist_ok=True)
+        f.write_text(body)
+    print(f"README.md tables and {len(svgs)} charts updated")
     return 0
 
 

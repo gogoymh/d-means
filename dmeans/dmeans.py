@@ -75,7 +75,8 @@ class DMeans:
     # --- stage 1 ---------------------------------------------------------------------------
     def _micro(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         k0 = int(min(self.over * self.k, max(self.k, len(x) // 4)))
-        mc, _ = EMeans(k0, nepochs=self.nepochs, seed=self.seed).fit(x)
+        self.engine = EMeans(k0, nepochs=self.nepochs, seed=self.seed)
+        mc, _ = self.engine.fit(x)
         ml, _ = nearest(x, mc)
         used = np.unique(ml)  # drop micro-clusters that ended empty
         remap = np.full(k0, -1)
@@ -196,6 +197,7 @@ class DMeans:
             "decisions": len(self.pairs) + int(len(self.asked)),
             "decisions_per_point": (len(self.pairs) + len(self.asked)) / len(x),
             "points_moved": int(self.changed),
+            "engine_epochs": self.engine.epochs_run,
         }
         log.info("d-means done: %s", self.report)
         return labels

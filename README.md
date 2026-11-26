@@ -3,19 +3,14 @@
 </h1>
 
 <p align="center">
-  Python 3.10+ · <a href="LICENSE">MIT License</a>
-</p>
-
-<p align="center">
+  Python 3.10+ · <a href="LICENSE">MIT License</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#benchmark">Benchmark</a> ·
   <a href="#decision-models">Decision models</a>
 </p>
 
-k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
-
-**d-means** starts by comparing independent clusters from the embeddings and the words in each text. When they agree, it fits a joint representation at the document level. Otherwise, it asks a decision model which micro-clusters to merge and where to place borderline texts. The decision model can be [Jev](https://docs.typesafe.ai), [Clef](https://blog.cloudflare.com/clef-decision-models), a chat LLM, or your own function.
+[e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) make k-means **faster**, not **right**. **d-means** combines embedding–lexical consensus with a decision model ([Clef](https://blog.cloudflare.com/clef-decision-models), [Jev](https://docs.typesafe.ai), or any LLM) to settle hard boundaries.
 
 ### Semantic clustering benchmark
 

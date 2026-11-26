@@ -10,7 +10,7 @@
   <a href="#decision-models">Decision models</a>
 </p>
 
-[e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) make k-means **faster**, not **right**. **d-means** combines embedding–lexical consensus with a decision model to settle hard boundaries.
+**d-means** groups texts by the topics or intents they share. It combines embedding similarity and word usage, and calls a decision model when those signals disagree.
 
 ### Semantic clustering benchmark
 

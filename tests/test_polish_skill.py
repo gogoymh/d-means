@@ -74,3 +74,70 @@ def test_principles_and_checklist():
     assert "바꾸지 않" in text
     checklist_items = re.findall(r"(?m)^-\s*\[\s\]\s+.+$", text)
     assert len(checklist_items) >= 3, f"expected at least 3 checklist items, found {len(checklist_items)}"
+
+
+_PAIR_RE = re.compile(r"(?m)^-\s*(원문|고친 예)[^:\n]*:\s*\n?\s*`([^`]+)`")
+
+
+def _pairs(text: str) -> list[tuple[str, str]]:
+    """Pair each before example with the rewrite that follows it."""
+    pairs, before = [], None
+    for kind, body in _PAIR_RE.findall(text):
+        if kind == "원문":
+            before = body
+        elif before is not None:
+            pairs.append((before, body))
+            before = None
+    return pairs
+
+
+def _block_with(text: str, *phrases: str) -> str:
+    blocks = [b for b in _sections(text) if all(p in b for p in phrases) and "원문" in b and "고친 예" in b]
+    assert blocks, f"missing pattern block with before/after examples for: {phrases}"
+    return blocks[0]
+
+
+def test_particle_doubling_and_mismatch_pattern():
+    block = _block_with(_read_skill(), "을(를)", "(으)로", "받침")
+    pairs = _pairs(block)
+    assert len(pairs) >= 4
+    assert any("을(를)" in b for b, _ in pairs) and any("(으)로" in b for b, _ in pairs)
+    for _, after in pairs:
+        assert not re.search(r"\((?:를|을|으|는|은|가|이)\)", after), after
+    rewrites = " ".join(a for _, a in pairs)
+    for expected in ("DM-27을", "DM-22를", "DM-30을", "DM-15는"):
+        assert expected in rewrites, expected
+
+
+def test_nominal_cliche_patterns():
+    text = _read_skill()
+    for phrase in ("진행해야", "해당하고", "및", "누락 시"):
+        pairs = [(b, a) for b, a in _pairs(_block_with(text, phrase)) if phrase in b]
+        assert pairs, f"no before example contains: {phrase}"
+        for _, after in pairs:
+            assert phrase not in after, f"rewrite still contains {phrase}: {after}"
+
+
+def test_english_mixing_pattern():
+    pairs = _pairs(_block_with(_read_skill(), "done이", "is done"))
+    assert len(pairs) >= 2
+    for _, after in pairs:
+        assert not re.search(r"\bdone\b", after), after
+        assert after.rstrip().endswith("니다.") or after.rstrip().endswith("므로"), after
+
+
+_ID_RE = re.compile(r"DM-\d+|#\d+|[A-Za-z0-9_./-]+\.(?:png|jpg|md|py|json)")
+
+
+def test_rewrites_keep_identifiers():
+    pairs = _pairs(_read_skill())
+    assert len(pairs) >= 15
+    for before, after in pairs:
+        missing = [t for t in set(_ID_RE.findall(before)) if t not in after]
+        assert not missing, f"rewrite dropped {missing}: {after}"
+
+
+def test_checklist_covers_new_patterns():
+    items = "\n".join(re.findall(r"(?m)^-\s*\[\s\]\s+.+$", _read_skill()))
+    for phrase in ("을(를)", "진행하다", "done", "피동"):
+        assert phrase in items, phrase

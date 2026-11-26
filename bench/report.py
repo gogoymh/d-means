@@ -73,17 +73,20 @@ def summary(res: dict) -> str:
             trails.append(f"{_name(d)} ({', '.join(METRIC[m] + ' ' + _delta(mean, m) for m in lost[d])})")
     if trails:
         out += f" It trails on {_and(trails)}; [why](#where-d-means-loses)."
+    model = res.get("jev_model", MODEL)
+    answers = paths(model)[0]
     n = res.get("jev_answers")
-    if n is None and ANSWERS.exists():
+    if n is None and model == MODEL and ANSWERS.exists():
         with gzip.open(ANSWERS, "rt") as f:
             n = sum(1 for _ in f)
     if n:
-        out += f" Every d-means number comes from real Jev 1.14 answers through OpenRouter ({n:,} decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz))."
+        out += f" Every d-means number comes from {MODELS.get(model, model)} answers through OpenRouter ({n:,} decisions, committed in [`bench/results/{answers.name}`](bench/results/{answers.name}))."
     return out
 
 
 def semantic_table(res: dict) -> str:
     ds = list(res["datasets"])
+    model = res.get("jev_model", MODEL)
     headers = [method.replace("-", "&#8209;") for method in METHODS]
     headers[METHODS.index("d-means")] = "**d&#8209;means**"
     rows = [
@@ -91,7 +94,7 @@ def semantic_table(res: dict) -> str:
         "|:--|" + "--:|" * len(METHODS),
     ]
     run_details = [
-        "| Dataset | Texts | Clusters | Lead (pp) | Jev cost/run |",
+        "| Dataset | Texts | Clusters | Lead (pp) | Cost/run |",
         "|:--|--:|--:|--:|--:|",
     ]
     for d in ds:
@@ -112,7 +115,7 @@ def semantic_table(res: dict) -> str:
     seeds = ", ".join(map(str, res["seeds"]))
     return (
         "\n".join(rows)
-        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. "
+        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. d-means uses {MODELS.get(model, model)}. "
         + summary(res)
         + "\n\n<details><summary>Run details, NMI and ARI</summary>\n\n"
         + "\n".join(run_details)
@@ -297,8 +300,8 @@ def charts() -> dict[Path, str]:
 def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
     models = model_results()
-    widest = max(models, key=lambda m: len(models[m]["datasets"]))  # the model that ran the most datasets shows where d-means loses
-    blocks = {"semantic": semantic_table(sem), "models": models_table(models), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
+    widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
+    blocks = {"semantic": semantic_table(models[widest]), "models": models_table(models), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

@@ -83,8 +83,9 @@ def test_summary_names_every_loss():
     assert "on 1 of 2 datasets" in text and "It trails on b (ACC -5.0, NMI -5.0, ARI -5.0)" in text
     assert "1,234 decisions" in text
     table = report.semantic_table(res)
-    assert "| a | 10 | 2 | 50.0 | 49.0 | 48.0 | **60.0** | +10.0 | $0.001 |" in table
-    assert "| b | 10 | 2 | **70.0** |" in table
+    assert "| a | 50.0 | 49.0 | 48.0 | **60.0** |" in table
+    assert "| a | 10 | 2 | +10.0 | $0.001 |" in table
+    assert "| b | **70.0** |" in table
 
 
 def test_readme_explains_each_dataset_d_means_loses_on():

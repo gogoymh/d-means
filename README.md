@@ -15,29 +15,41 @@
 
 k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
 
-**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: a typed decision model such as TypeSafe's [Jev](https://docs.typesafe.ai) or Cloudflare's open-weight [Clef](https://blog.cloudflare.com/clef-decision-models), any chat LLM, or your own function. Jev ran the table below; [Clef runs it too](#decision-models).
+**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: a typed decision model such as TypeSafe's [Jev](https://docs.typesafe.ai) or Cloudflare's open-weight [Clef](https://blog.cloudflare.com/clef-decision-models), any chat LLM, or your own function. The table below uses Clef, which was evaluated on all six datasets. [See the results by decision model](#decision-models).
 
 <!-- bench:semantic -->
 | Dataset | k&#8209;means | e&#8209;means | o&#8209;means | **d&#8209;means** |
 |:--|--:|--:|--:|--:|
-| TREC | 55.6 | 58.1 | 58.1 | **65.9** |
-| StackExchange | 37.6 | 33.7 | 34.8 | **42.3** |
+| TREC | 55.6 | 58.1 | 58.1 | **66.8** |
+| StackExchange | 37.6 | 33.7 | 34.8 | **42.4** |
+| AG News | **83.7** | 83.5 | 83.5 | 70.0 |
+| BBC News | 86.5 | **86.9** | **86.9** | 70.2 |
+| 20 Newsgroups | **56.9** | 49.3 | 52.4 | 47.2 |
+| Banking77 | 61.1 | 58.9 | 59.4 | **63.5** |
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed). Every d-means number comes from real Jev 1.14 answers through OpenRouter (8,866 decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz)).
+Clustering accuracy (%), mean of seeds 0, 1, 2. d-means uses Clef. d-means beats the best baseline on ACC, NMI and ARI on 3 of 6 datasets (TREC, StackExchange and Banking77 on every seed). It trails on AG News (ACC -13.7, NMI -1.5, ARI -8.7), BBC News (ACC -16.7, NMI -6.8, ARI -16.4) and 20 Newsgroups (ACC -9.6, NMI -1.0, ARI -3.1); [why](#where-d-means-loses). Every d-means number comes from Clef answers through OpenRouter (35,257 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
 
 <details><summary>Run details, NMI and ARI</summary>
 
-| Dataset | Texts | Clusters | Lead (pp) | Jev cost/run |
+| Dataset | Texts | Clusters | Lead (pp) | Cost/run |
 |:--|--:|--:|--:|--:|
-| TREC | 500 | 6 | +7.8 | $0.004 |
-| StackExchange | 3,000 | 50 | +4.7 | $0.033 |
+| TREC | 500 | 6 | +8.7 | $0.014 |
+| StackExchange | 3,000 | 50 | +4.8 | $0.115 |
+| AG News | 7,600 | 4 | -13.7 | $0.221 |
+| BBC News | 1,000 | 5 | -16.7 | $0.046 |
+| 20 Newsgroups | 7,299 | 20 | -9.6 | $0.339 |
+| Banking77 | 3,080 | 77 | +2.4 | $0.123 |
 
 Lead is the accuracy difference from the best baseline, in percentage points.
 
 | Dataset | k-means NMI | e-means NMI | o-means NMI | d-means NMI | k-means ARI | e-means ARI | o-means ARI | d-means ARI |
 |:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 41.3 | 45.7 | 45.7 | **48.6** | 38.0 | 42.2 | 42.2 | **46.1** |
-| StackExchange | 48.1 | 46.0 | 46.8 | **52.3** | 23.1 | 18.6 | 20.7 | **28.9** |
+| TREC | 41.3 | 45.7 | 45.7 | **50.5** | 38.0 | 42.2 | 42.2 | **47.3** |
+| StackExchange | 48.1 | 46.0 | 46.8 | **52.1** | 23.1 | 18.6 | 20.7 | **28.9** |
+| AG News | 59.9 | **60.1** | **60.1** | 58.6 | **62.8** | 62.4 | 62.4 | 54.1 |
+| BBC News | 80.9 | **82.0** | **82.0** | 75.2 | 79.2 | **80.2** | **80.2** | 63.8 |
+| 20 Newsgroups | **56.9** | 55.4 | 56.1 | 55.9 | **40.1** | 38.4 | 39.4 | 37.0 |
+| Banking77 | 80.3 | 80.5 | 80.6 | **85.2** | 51.2 | 50.3 | 50.7 | **56.5** |
 
 </details>
 <!-- /bench:semantic -->
@@ -46,7 +58,7 @@ Lead is the accuracy difference from the best baseline, in percentage points.
   <img src="assets/clustering-comparison.png" alt="Four plots comparing the clustering accuracy of k-means, e-means, o-means and d-means as effective passes increase on TREC and StackExchange." width="960">
 </p>
 
-Each marker is the mean of three runs at that training budget. Pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
+The TREC and StackExchange convergence plot uses Jev 1.14. Each marker is the mean of three runs, and pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
 
 ## How it works
 
@@ -122,7 +134,7 @@ The same benchmark, with only the model that answers the questions swapped:
 d-means ACC (%), mean of seeds 0, 1, 2. Same embeddings, seeds, questions and defaults; only the model answering them changes. *Wins* counts datasets where d-means beats the best baseline. *Cost* is OpenRouter's billed `usage.cost` per decision on the live run. `bench.semantic --model cloudflare/clef --verify` replays Clef offline.
 <!-- /bench:models -->
 
-Clef edges Jev where both ran and wins Banking77 (k=77). It trails on the three news datasets: there even the geometric merge of the same micro-clusters lands below plain k-means, and Clef's merges do not win it back ([stages](#where-d-means-loses)). Jev has not run those three yet.
+Clef edges Jev where both ran and wins Banking77 (k=77). On AG News, BBC News and 20 Newsgroups, the geometric merge already trails the best baseline. See the [stage-by-stage results](#where-d-means-loses).
 
 ## Benchmark
 
@@ -135,7 +147,7 @@ uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about
 uv run pytest                              # 44 offline tests, about 20 s
 ```
 
-Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent are pinned and wait for a live run. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
+Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (k-means++, Lloyd to convergence), e-means and o-means at 5 epochs, all on the same embeddings and seeds.
 
 **Ablations.** Every variant tried is listed. Defaults were fixed before the first run and none was tuned on these datasets.
 

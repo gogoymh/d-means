@@ -10,7 +10,7 @@
   <a href="#decision-models">Decision models</a>
 </p>
 
-[e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) make k-means **faster**, not **right**. **d-means** combines embedding–lexical consensus with a decision model ([Clef](https://blog.cloudflare.com/clef-decision-models), [Jev](https://docs.typesafe.ai), or any LLM) to settle hard boundaries.
+[e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) make k-means **faster**, not **right**. **d-means** combines embedding–lexical consensus with a decision model like [Jev](https://docs.typesafe.ai) or [Clef](https://blog.cloudflare.com/clef-decision-models) to settle hard boundaries.
 
 ### Semantic clustering benchmark
 

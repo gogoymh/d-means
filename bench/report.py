@@ -84,15 +84,24 @@ def summary(res: dict) -> str:
 
 def semantic_table(res: dict) -> str:
     ds = list(res["datasets"])
+    headers = [method.replace("-", "&#8209;") for method in METHODS]
+    headers[METHODS.index("d-means")] = "**d&#8209;means**"
     rows = [
-        "| Dataset | n | k | " + " | ".join("**d-means**" if m == "d-means" else m for m in METHODS) + " | vs best | Jev cost / run |",
-        "|:--|--:|--:|" + "--:|" * (len(METHODS) + 2),
+        "| Dataset | " + " | ".join(headers) + " |",
+        "|:--|" + "--:|" * len(METHODS),
+    ]
+    run_details = [
+        "| Dataset | Texts | Clusters | Lead (pp) | Jev cost/run |",
+        "|:--|--:|--:|--:|--:|",
     ]
     for d in ds:
         r = res["datasets"][d]
         usd = _usd(res, d)
         cost = "-" if usd is None else f"${usd:.3f}"
-        rows.append(f"| {_name(d)} | {r['n']:,} | {r['k']} | " + " | ".join(_cells(r["mean"], "acc")) + f" | {_delta(r['mean'], 'acc')} | {cost} |")
+        rows.append(f"| {_name(d)} | " + " | ".join(_cells(r["mean"], "acc")) + " |")
+        run_details.append(
+            f"| {_name(d)} | {r['n']:,} | {r['k']} | {_delta(r['mean'], 'acc')} | {cost} |"
+        )
     detail = [
         "| Dataset | " + " | ".join(f"{m} NMI" for m in METHODS) + " | " + " | ".join(f"{m} ARI" for m in METHODS) + " |",
         "|:--|" + "--:|" * (2 * len(METHODS)),
@@ -103,9 +112,11 @@ def semantic_table(res: dict) -> str:
     seeds = ", ".join(map(str, res["seeds"]))
     return (
         "\n".join(rows)
-        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. *vs best* is d-means minus the best baseline. "
+        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. "
         + summary(res)
-        + "\n\n<details><summary>NMI and ARI</summary>\n\n"
+        + "\n\n<details><summary>Run details, NMI and ARI</summary>\n\n"
+        + "\n".join(run_details)
+        + "\n\nLead is the accuracy difference from the best baseline, in percentage points.\n\n"
         + "\n".join(detail)
         + "\n\n</details>"
     )

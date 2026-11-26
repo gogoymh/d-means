@@ -1,33 +1,38 @@
 <h1 align="center">
-  <img src="assets/d-means-hero.jpg" alt="d-means: k-means that asks before it guesses. A sculpted D with three clusters of spheres." width="960">
+  <img src="assets/d-means-hero.jpg" alt="D-means: Decision model for clustering. A sculpted D with three clusters of spheres." width="960">
 </h1>
 
 <p align="center">
-  Geometry decides <i>how far</i>. A typed decision model decides <i>what kind</i>.
+  Python 3.10+ · <a href="LICENSE">MIT License</a>
 </p>
 
 <p align="center">
-  <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-black">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-black">
-  <img alt="decision models" src="https://img.shields.io/badge/decisions-Jev%201.14%20%7C%20Clef-black">
-  <img alt="deps" src="https://img.shields.io/badge/deps-numpy%20%2B%20scikit--learn-black">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#benchmark">Benchmark</a> ·
+  <a href="#decision-models">Decision models</a>
 </p>
-
----
 
 k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
 
 **d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: a typed decision model such as TypeSafe's [Jev](https://docs.typesafe.ai) or Cloudflare's open-weight [Clef](https://blog.cloudflare.com/clef-decision-models), any chat LLM, or your own function. Jev ran the table below; [Clef runs it too](#decision-models).
 
 <!-- bench:semantic -->
-| Dataset | n | k | k-means | e-means | o-means | **d-means** | vs best | Jev cost / run |
-|:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 500 | 6 | 55.6 | 58.1 | 58.1 | **65.9** | +7.8 | $0.004 |
-| StackExchange | 3,000 | 50 | 37.6 | 33.7 | 34.8 | **42.3** | +4.7 | $0.033 |
+| Dataset | k&#8209;means | e&#8209;means | o&#8209;means | **d&#8209;means** |
+|:--|--:|--:|--:|--:|
+| TREC | 55.6 | 58.1 | 58.1 | **65.9** |
+| StackExchange | 37.6 | 33.7 | 34.8 | **42.3** |
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the best baseline. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed). Every d-means number comes from real Jev 1.14 answers through OpenRouter (8,866 decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz)).
+Clustering accuracy (%), mean of seeds 0, 1, 2. d-means beats the best baseline on ACC, NMI and ARI on 2 of 2 datasets (TREC and StackExchange on every seed). Every d-means number comes from real Jev 1.14 answers through OpenRouter (8,866 decisions, committed in [`bench/results/jev-answers.jsonl.gz`](bench/results/jev-answers.jsonl.gz)).
 
-<details><summary>NMI and ARI</summary>
+<details><summary>Run details, NMI and ARI</summary>
+
+| Dataset | Texts | Clusters | Lead (pp) | Jev cost/run |
+|:--|--:|--:|--:|--:|
+| TREC | 500 | 6 | +7.8 | $0.004 |
+| StackExchange | 3,000 | 50 | +4.7 | $0.033 |
+
+Lead is the accuracy difference from the best baseline, in percentage points.
 
 | Dataset | k-means NMI | e-means NMI | o-means NMI | d-means NMI | k-means ARI | e-means ARI | o-means ARI | d-means ARI |
 |:--|--:|--:|--:|--:|--:|--:|--:|--:|

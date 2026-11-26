@@ -37,6 +37,12 @@ Clustering accuracy (%), mean of seeds 0, 1, 2. *vs best* is d-means minus the b
 </details>
 <!-- /bench:semantic -->
 
+<p align="center">
+  <img src="assets/clustering-comparison.png" alt="Four plots comparing the clustering accuracy of k-means, e-means, o-means and d-means as effective passes increase on TREC and StackExchange." width="960">
+</p>
+
+Each marker is the mean of three runs at that training budget. Pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
+
 ## How it works
 
 ```mermaid

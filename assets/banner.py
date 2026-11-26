@@ -1,8 +1,11 @@
 """Render a letter D of small spheres, clustered at its corners, next to the D-means wordmark.
 
-    uv run python assets/banner.py          # writes d-means-banner.png and d-means-banner-dark.png
-    uv run python assets/banner.py OUTDIR   # writes them into OUTDIR instead
+    uv run python assets/banner.py                   # writes d-means-banner.png and d-means-banner-dark.png
+    uv run python assets/banner.py OUTDIR            # writes them into OUTDIR instead
+    uv run python assets/banner.py --preview         # light banner on the left, dark banner on the right
+    uv run python assets/banner.py --preview OUTDIR  # same stitch, from the PNGs already in OUTDIR
 
+`--preview` stitches the two PNGs already on disk into d-means-banner-preview.png.
 Pure numpy: an analytic ray tracer (soft shadows, ambient occlusion, satin reflections)
 and a small PNG codec, so the banner needs no image library and no licensed art.
 """
@@ -450,11 +453,49 @@ def _unfilter_slow(f, row, prev, ch):
     return cur.astype(np.uint8)
 
 
+THEME_FILES = (("light", "d-means-banner.png"), ("dark", "d-means-banner-dark.png"))
+PREVIEW_NAME = "d-means-banner-preview.png"
+
+
+def side_by_side(light: np.ndarray, dark: np.ndarray) -> np.ndarray:
+    """Light theme on the left, dark theme on the right."""
+    light = np.ascontiguousarray(light[..., :3], np.uint8)
+    dark = np.ascontiguousarray(dark[..., :3], np.uint8)
+    if light.shape != dark.shape:
+        raise ValueError(f"theme sizes differ: light {light.shape} vs dark {dark.shape}")
+    return np.concatenate([light, dark], axis=1)
+
+
+def write_preview(outdir: Path) -> Path:
+    """Stitch the two theme PNGs already in `outdir`. Does not render."""
+    paths = {theme: outdir / name for theme, name in THEME_FILES}
+    missing = [path for path in paths.values() if not path.is_file()]
+    if missing:
+        listed = ", ".join(str(path) for path in missing)
+        where = "" if outdir == HERE else f" {outdir}"
+        raise SystemExit(f"missing {listed}\nrender them with: uv run python assets/banner.py{where}")
+    image = side_by_side(png_read(paths["light"]), png_read(paths["dark"]))
+    dest = outdir / PREVIEW_NAME
+    size = png_write(dest, image)
+    LOG.info("wrote %s (%d KB), light left, dark right", dest, size // 1024)
+    return dest
+
+
 def main(argv: list[str]) -> None:
     _log.setup()
-    outdir = Path(argv[0]) if argv else HERE
+    if any(arg in ("-h", "--help") for arg in argv):
+        print(__doc__.strip())
+        return
+    preview = "--preview" in argv
+    args = [arg for arg in argv if arg != "--preview"]
+    if len(args) > 1 or any(arg.startswith("-") for arg in args):
+        raise SystemExit(__doc__.strip())
+    outdir = Path(args[0]) if args else HERE
+    if preview:
+        write_preview(outdir)
+        return
     outdir.mkdir(parents=True, exist_ok=True)
-    for theme, name in (("light", "d-means-banner.png"), ("dark", "d-means-banner-dark.png")):
+    for theme, name in THEME_FILES:
         size = png_write(outdir / name, render(theme))
         LOG.info("wrote %s (%d KB)", outdir / name, size // 1024)
 

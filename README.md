@@ -322,6 +322,22 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 
 Both are faster solvers for the same objective. D-means changes what gets decided.
 
+## Banner preview
+
+`assets/banner.py` draws two banners, light and dark, each 1536×512. Review both themes side by side after a renderer change:
+
+```bash
+uv run python assets/banner.py --preview
+```
+
+The command writes `assets/d-means-banner-preview.png` with the light banner on the left and the dark banner on the right. It stitches the PNGs already on disk. Pass a directory to review banners written there:
+
+```bash
+uv run python assets/banner.py --preview OUTDIR
+```
+
+Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero, `assets/d-means-hero.jpg`, is a separate image.
+
 ## License
 
 MIT. Dependencies are NumPy, SciPy and scikit-learn (BSD). E-means and O-means are reimplemented here from their public descriptions.

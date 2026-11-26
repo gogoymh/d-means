@@ -125,3 +125,71 @@ def test_generator_reproduces_committed_banner(theme):
     fresh = banner.render(theme).astype(int)
     diff = np.abs(fresh - load(theme).astype(int))
     assert diff.max() <= 2 and diff.mean() < 0.05, (diff.max(), diff.mean())
+
+
+def _copy_banners(dest: Path, themes=("light", "dark")) -> None:
+    for theme in themes:
+        src = BANNERS[theme]
+        (dest / src.name).write_bytes(src.read_bytes())
+
+
+def test_preview_places_themes_side_by_side(tmp_path):
+    _copy_banners(tmp_path)
+    banner.main(["--preview", str(tmp_path)])
+    preview = banner.png_read(tmp_path / "d-means-banner-preview.png")[..., :3]
+    light, dark = load("light"), load("dark")
+    height, width, _ = light.shape
+    assert preview.shape == (height, width * 2, 3)
+    assert np.array_equal(preview[:, :width], light)
+    assert np.array_equal(preview[:, width:], dark)
+
+
+def test_preview_does_not_rerender(tmp_path, monkeypatch):
+    _copy_banners(tmp_path)
+
+    def fail(*_args, **_kwargs):
+        raise AssertionError("preview rendered a banner")
+
+    monkeypatch.setattr(banner, "render", fail)
+    banner.main(["--preview", str(tmp_path)])
+    assert (tmp_path / "d-means-banner-preview.png").is_file()
+
+
+@pytest.mark.parametrize("missing", ["light", "dark"])
+def test_preview_fails_when_a_theme_is_missing(tmp_path, missing):
+    keep = "dark" if missing == "light" else "light"
+    _copy_banners(tmp_path, (keep,))
+    with pytest.raises(SystemExit) as caught:
+        banner.main(["--preview", str(tmp_path)])
+    assert caught.value.code not in (0, None)
+    assert not (tmp_path / "d-means-banner-preview.png").exists()
+
+
+def test_readme_documents_banner_preview():
+    text = (ROOT / "README.md").read_text()
+    assert "uv run python assets/banner.py --preview" in text
+    assert "light banner on the left" in text
+    assert "dark banner on the right" in text
+
+
+def test_banner_doc_documents_preview_command():
+    doc = banner.__doc__ or ""
+    assert "uv run python assets/banner.py --preview" in doc
+    assert "light banner on the left" in doc
+    assert "dark banner on the right" in doc
+
+
+def test_render_command_still_writes_both_themes(tmp_path, monkeypatch):
+    calls = []
+
+    def fake(theme="light"):
+        calls.append(theme)
+        fill = 255 if theme == "light" else 0
+        return np.full((4, 6, 3), fill, np.uint8)
+
+    monkeypatch.setattr(banner, "render", fake)
+    banner.main([str(tmp_path)])
+    assert calls == ["light", "dark"]
+    assert (tmp_path / "d-means-banner.png").is_file()
+    assert (tmp_path / "d-means-banner-dark.png").is_file()
+    assert not (tmp_path / "d-means-banner-preview.png").exists()

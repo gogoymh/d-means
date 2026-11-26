@@ -65,7 +65,7 @@ def summary(res: dict, *, consensus: bool = False) -> str:
         d for d in wins
         if all(r["acc"] > max(res["datasets"][d]["runs"][b][i]["acc"] for b in BASELINES) for i, r in enumerate(res["datasets"][d]["runs"]["d-means"]))
     ]
-    out = f"d-means beats the best baseline on ACC, NMI and ARI on {len(wins)} of {len(ds)} datasets"
+    out = f"D-means beats the best baseline on ACC, NMI and ARI on {len(wins)} of {len(ds)} datasets"
     out += "."
     if every_seed:
         out += f" ACC leads on every seed for {_and([_name(d) for d in every_seed])}."
@@ -83,15 +83,15 @@ def summary(res: dict, *, consensus: bool = False) -> str:
         with gzip.open(ANSWERS, "rt") as f:
             n = sum(1 for _ in f)
     if n and not consensus:
-        out += f" Every d-means number comes from {MODELS.get(model, model)} answers through OpenRouter ({n:,} decisions, committed in [`bench/results/{answers.name}`](bench/results/{answers.name}))."
+        out += f" Every D-means number comes from {MODELS.get(model, model)} answers through OpenRouter ({n:,} decisions, committed in [`bench/results/{answers.name}`](bench/results/{answers.name}))."
     return out
 
 
 def semantic_table(res: dict, *, consensus: bool = False) -> str:
     ds = list(res["datasets"])
     model = res.get("jev_model", MODEL)
-    headers = [method.replace("-", "&#8209;") for method in METHODS]
-    headers[METHODS.index("d-means")] = "**d&#8209;means**"
+    headers = [method.capitalize().replace("-", "&#8209;") for method in METHODS]
+    headers[METHODS.index("d-means")] = "**D&#8209;means**"
     rows = [
         "| Dataset | " + " | ".join(headers) + " |",
         "|:--|" + "--:|" * len(METHODS),
@@ -111,7 +111,7 @@ def semantic_table(res: dict, *, consensus: bool = False) -> str:
             f"| {_name(d)} | {r['n']:,} | {r['k']} | {_delta(r['mean'], 'acc')} | {cost} |"
         )
     detail = [
-        "| Dataset | " + " | ".join(f"{m} NMI" for m in METHODS) + " | " + " | ".join(f"{m} ARI" for m in METHODS) + " |",
+        "| Dataset | " + " | ".join(f"{m.capitalize()} NMI" for m in METHODS) + " | " + " | ".join(f"{m.capitalize()} ARI" for m in METHODS) + " |",
         "|:--|" + "--:|" * (2 * len(METHODS)),
     ]
     for d in ds:
@@ -120,9 +120,9 @@ def semantic_table(res: dict, *, consensus: bool = False) -> str:
     seeds = ", ".join(map(str, res["seeds"]))
     model_name = MODELS.get(model, model)
     if consensus:
-        evidence = f"d-means uses embedding–lexical consensus where the views agree and {model_name} otherwise. "
+        evidence = f"D-means uses embedding–lexical consensus where the views agree and {model_name} otherwise. "
     else:
-        evidence = f"d-means uses {model_name}. "
+        evidence = f"D-means uses {model_name}. "
     return (
         "\n".join(rows)
         + f"\n\nClustering accuracy (%), mean of seeds {seeds}. "
@@ -200,7 +200,7 @@ def ablation_table(res: dict) -> str:
         means = [res["datasets"][d]["mean"][m] for d in ds]
         dpp = [v.get("decisions_per_point", 0.0) for v in means]
         span = "0" if not any(dpp) else f"{min(dpp):.2f} to {max(dpp):.2f}"
-        rows.append(f"| {'**d-means (default)**' if m == 'd-means' else m} | " + " | ".join(_pct(v["acc"]) for v in means) + f" | {span} |")
+        rows.append(f"| {'**D-means (default)**' if m == 'd-means' else m} | " + " | ".join(_pct(v["acc"]) for v in means) + f" | {span} |")
     return "\n".join(rows) + "\n\nACC (%), mean of the same seeds."
 
 
@@ -228,7 +228,7 @@ def diagnose_table(res: dict, model: str = MODEL) -> str:
             moves,
         ]
         rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
-    return "### Where d-means loses\n\n" + "\n".join(rows) + (
+    return "### Where D-means loses\n\n" + "\n".join(rows) + (
         f"\n\nACC (%) after each stage of a default run with {MODELS.get(model, model)}, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. "
         f"*Noul AUC* ranks {name}'s p(same) on the asked pairs against \"same majority class\" (0.5 is chance). "
         "*Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run."
@@ -236,7 +236,7 @@ def diagnose_table(res: dict, model: str = MODEL) -> str:
 
 
 def mse_table(res: dict) -> str:
-    rows = ["| Problem | Epochs | e-means MSE vs Lloyd@25 | o-means MSE vs Lloyd@25 | o-means distances vs e-means | Lloyd@25 time | e-means time | o-means time |", "|:--|--:|--:|--:|--:|--:|--:|--:|"]
+    rows = ["| Problem | Epochs | E-means MSE vs Lloyd@25 | O-means MSE vs Lloyd@25 | O-means distances vs E-means | Lloyd@25 time | E-means time | O-means time |", "|:--|--:|--:|--:|--:|--:|--:|--:|"]
     for name, r in res.items():
         lloyd_s = r["Lloyd"][-1]["seconds"]
         for e, o in zip(r["e-means"], r["o-means"]):
@@ -253,25 +253,25 @@ def _decider(p: dict) -> str:
 
 
 def reach_sentence(p: dict) -> tuple[str, str]:
-    """(chart alt text, README sentence): whether d-means reaches the best baseline's final accuracy first, as measured."""
+    """(chart alt text, README sentence): whether D-means reaches the best baseline's final accuracy first, as measured."""
     reach = p["epochs_to_target"]
     d = reach["d-means"]
     base = min((reach[m], m) for m in BASELINES if reach[m] is not None)
     if d is None:
         best = max(p["mean"]["d-means"])
         return (
-            "d-means never reaches the best baseline's final accuracy",
-            f"d-means does not reach it at any budget: its best is {100 * best:.1f}%. {base[1]} gets there first, at {base[0]:.3g} epochs.",
+            "D-means never reaches the best baseline's final accuracy",
+            f"D-means does not reach it at any budget: its best is {100 * best:.1f}%. {base[1].capitalize()} gets there first, at {base[0]:.3g} epochs.",
         )
     when = f"at its first budget, {d:.3g} epochs" if d == p["passes"]["d-means"][0] else f"at {d:.3g} epochs"
     if d < base[0]:
         return (
-            f"d-means clears the best baseline's final accuracy after {d:.3g} epochs",
-            f"d-means passes it {when}, {base[0] / d:.0f}x sooner than the fastest baseline gets there ({base[1]}, {base[0]:.3g} epochs).",
+            f"D-means clears the best baseline's final accuracy after {d:.3g} epochs",
+            f"D-means passes it {when}, {base[0] / d:.0f}x sooner than the fastest baseline gets there ({base[1].capitalize()}, {base[0]:.3g} epochs).",
         )
     return (
-        f"d-means reaches the best baseline's final accuracy after {d:.3g} epochs, not first",
-        f"d-means reaches it {when}; {base[1]} gets there first, at {base[0]:.3g} epochs.",
+        f"D-means reaches the best baseline's final accuracy after {d:.3g} epochs, not first",
+        f"D-means reaches it {when}; {base[1].capitalize()} gets there first, at {base[0]:.3g} epochs.",
     )
 
 
@@ -292,14 +292,14 @@ def convergence_block(res: dict) -> str:
                 cells.append("-" if t not in at[m] else (f"**{_pct(at[m][t])}**" if at[m][t] == best else _pct(at[m][t])))
             r = reach[m]
             cells.append("never" if r is None else (f"**{r:.3g}**" if r == fastest else f"{r:.3g}"))
-            rows.append(f"| {'**d-means**' if m == 'd-means' else m} | " + " | ".join(cells) + " |")
+            rows.append(f"| {'**D-means**' if m == 'd-means' else m.capitalize()} | " + " | ".join(cells) + " |")
         alt, verdict = reach_sentence(p)
         parts.append(
             f'<picture>\n  <source media="(prefers-color-scheme: dark)" srcset="{img}-dark.svg">\n'
             f'  <img alt="{chart.TITLE}: {alt}" src="{img}-light.svg" width="100%">\n</picture>\n\n'
             + "\n".join(rows)
             + f"\n\n{chart.name(p)}, mean of {len(p['acc']['d-means'])} seeds, decisions from {_decider(p)}. The best baseline ends at {100 * target['acc']:.1f}% "
-            f"({target['method']}, {chart.frac(target['epochs'])} epochs). {verdict}"
+            f"({target['method'].capitalize()}, {chart.frac(target['epochs'])} epochs). {verdict}"
         )
     return "\n\n".join(parts)
 
@@ -310,7 +310,9 @@ def charts() -> dict[Path, str]:
     if not path.exists():
         return {}
     res = json.loads(path.read_text())
-    return {ASSETS / f"convergence-{prob}-{theme}.svg": chart.svg(p, theme) for prob, p in res["problems"].items() for theme in chart.THEMES}
+    files = {ASSETS / f"convergence-{prob}-{theme}.svg": chart.svg(p, theme) for prob, p in res["problems"].items() for theme in chart.THEMES}
+    files[ASSETS / "clustering-comparison.svg"] = chart.comparison_svg(res["problems"])
+    return files
 
 
 def render(text: str) -> str:

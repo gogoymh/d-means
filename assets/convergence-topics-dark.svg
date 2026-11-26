@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 484" width="800" height="484" role="img" aria-labelledby="t d">
-<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (k-means). Epochs needed to reach it: d-means 0.0213, k-means 16, e-means 3.93, o-means 3.93.</desc>
+<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (K-means). Epochs needed to reach it: D-means 0.0213, K-means 16, E-means 3.93, O-means 3.93.</desc>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;fill:#9198a1;font-size:12px}.h{fill:#f0f6fc;font-size:17px;font-weight:600}.n{font-variant-numeric:tabular-nums}.k{fill:#f0f6fc;font-weight:600}</style>
 <text class="h" x="56" y="32">Clustering accuracy vs. epochs</text>
 <text x="56" y="54">Synthetic topics, n=3,000, k=6. Mean of 50 seeds. Decisions: simulated, wrong on 20% of answers, 0.18 per point.</text>
-<g data-legend="d-means"><line x1="56" y1="86" x2="76" y2="86" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="86" r="4" fill="#f0f6fc"/><text x="84" y="90" class="k">d-means</text></g>
-<g data-legend="k-means"><line x1="160.4" y1="86" x2="180.4" y2="86" stroke="#338ced" stroke-width="2" stroke-linecap="round"/><circle cx="170.4" cy="86" r="4" fill="#338ced"/><text x="188.4" y="90">k-means</text></g>
-<g data-legend="e-means"><line x1="264.8" y1="86" x2="284.8" y2="86" stroke="#e76624" stroke-width="2" stroke-linecap="round"/><circle cx="274.8" cy="86" r="4" fill="#e76624"/><text x="292.8" y="90">e-means</text></g>
-<g data-legend="o-means"><line x1="369.20000000000005" y1="86" x2="389.20000000000005" y2="86" stroke="#00a888" stroke-width="2" stroke-linecap="round"/><circle cx="379.20000000000005" cy="86" r="4" fill="#00a888"/><text x="397.20000000000005" y="90">o-means</text></g>
+<g data-legend="d-means"><line x1="56" y1="86" x2="76" y2="86" stroke="#f0f6fc" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="86" r="4" fill="#f0f6fc"/><text x="84" y="90" class="k">D-means</text></g>
+<g data-legend="k-means"><line x1="160.4" y1="86" x2="180.4" y2="86" stroke="#338ced" stroke-width="2" stroke-linecap="round"/><circle cx="170.4" cy="86" r="4" fill="#338ced"/><text x="188.4" y="90">K-means</text></g>
+<g data-legend="e-means"><line x1="264.8" y1="86" x2="284.8" y2="86" stroke="#e76624" stroke-width="2" stroke-linecap="round"/><circle cx="274.8" cy="86" r="4" fill="#e76624"/><text x="292.8" y="90">E-means</text></g>
+<g data-legend="o-means"><line x1="369.20000000000005" y1="86" x2="389.20000000000005" y2="86" stroke="#00a888" stroke-width="2" stroke-linecap="round"/><circle cx="379.20000000000005" cy="86" r="4" fill="#00a888"/><text x="397.20000000000005" y="90">O-means</text></g>
 <text x="56" y="122" class="k">Accuracy (%)</text>
 <line x1="56" y1="420.0" x2="728" y2="420.0" stroke="#3d444d" stroke-width="1"/>
 <text x="46" y="424.0" text-anchor="end" class="n">30</text>
@@ -29,7 +29,7 @@
 <text x="728.0" y="440" text-anchor="middle" class="n">16</text>
 <text x="392.0" y="468" text-anchor="middle" class="k">Epochs: passes over the data (log scale)</text>
 <line x1="56" y1="317.4" x2="728" y2="317.4" stroke="#9198a1" stroke-width="1" stroke-opacity="0.55"/>
-<text x="64" y="310.4">Best baseline final: 41.1% (k-means, 16 epochs)</text>
+<text x="64" y="310.4">Best baseline final: 41.1% (K-means, 16 epochs)</text>
 <g data-method="k-means"><path d="M459.2,343.8 L526.4,332.5 L593.6,323.4 L660.8,320.6 L728.0,317.4" fill="none" stroke="#338ced" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="459.2" cy="343.8" r="3.5" fill="#338ced" stroke="#0d1117" stroke-width="2"/>
 <circle cx="526.4" cy="332.5" r="3.5" fill="#338ced" stroke="#0d1117" stroke-width="2"/>
@@ -74,6 +74,6 @@
 <circle cx="712.6" cy="237.0" r="4.5" fill="#f0f6fc" stroke="#0d1117" stroke-width="2"/>
 </g>
 <line x1="86.2" y1="150" x2="86.2" y2="246.7" stroke="#f0f6fc" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="92.2" y="158" class="k">d-means reaches it at 0.0213 epochs</text>
+<text x="92.2" y="158" class="k">D-means reaches it at 0.0213 epochs</text>
 <text x="722.6" y="241.0" class="k n">49.9%</text>
 </svg>

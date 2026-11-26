@@ -1,28 +1,37 @@
 """d-means: k-means steered by a typed decision model.
 
 Geometry is good at "how far", bad at "what kind". k-means, e-means and o-means all cut the
-embedding space by distance alone, so they merge two categories that sit close together and
-split one that is spread out, and they guess on points that sit between two centroids.
-d-means keeps the fast geometry and hands the two decisions geometry cannot make to a
-decision model (any `ask(requests) -> answers`, see dmeans.deciders), which reads the texts:
+embedding space by distance alone, so they guess on the points that sit between two groups.
+d-means keeps the geometry and hands the decisions geometry cannot make to a decision model
+(any `ask(requests) -> answers`, see dmeans.deciders), which reads the texts.
 
-The default path always uses the decider. With explicit consensus=True, a joint fit can
-instead preserve topics when embedding clusters and an independent lexical view agree.
-The decision path is:
+Default path (start="kmeans"):
 
-1. Over-cluster. e-means splits the data into `over * k` micro-clusters, which are much purer
-   than k clusters.
+1. Partition. K-means with `restarts` initializations (k-means++, best inertia) splits the
+   embeddings into k groups.
+2. Settle the borderline points. The `budget` share of points with the smallest margin between
+   their two nearest centroids get a Choice question over their nearest `candidates` groups,
+   each shown as a card (typical words and example texts). The decider's probabilities are
+   multiplied with the geometric posterior and the point takes the argmax.
+
+Merge path (start="merge", the v1 strategy, kept for replaying recorded runs):
+
+1. Over-cluster. e-means splits the data into `over * k` micro-clusters.
 2. Merge by decision. For each micro-cluster and its nearest neighbours, the decider answers a Noul:
    do these two groups share one topic? Pairs it was not asked about get a prior fitted on
    the pairs it was asked about (isotonic in centroid cosine). Average-linkage on 1 - p joins
    the micro-clusters into exactly k groups.
-3. Settle the borderline points. The `budget` share of points with the smallest margin between
-   their two nearest groups get a Choice question over their nearest `candidates` groups. The decider's
-   probabilities are multiplied with the geometric posterior and the point takes the argmax.
+3. Settle the borderline points, as above.
 
-Every call goes through a decider with `ask(requests) -> answers` (see dmeans.deciders): any
-chat LLM, Jev, Clef, or a plain function `fn(state, question)`. Answers are checked and coerced into one shape,
-so the algorithm is tested offline with a scripted decider and replayed offline from cached answers.
+The merge path can fix structure that geometry gets wrong (a class split across distant modes),
+but with real decision models its pairwise answers are often too strict to merge well; on the six
+semantic benchmarks the default path is more accurate on every dataset (bench/results/semantic-clef.json).
+With explicit consensus=True, a joint fit can instead preserve topics when embedding clusters and
+an independent lexical view agree.
+
+Every call goes through a decider with `ask(requests) -> answers`: any chat LLM, Jev, Clef, or a
+plain function `fn(state, question)`. Answers are checked and coerced into one shape, so the
+algorithm is tested offline with a scripted decider and replayed offline from cached answers.
 """
 
 import numpy as np
@@ -71,17 +80,22 @@ class DMeans:
         about: str = "topic",
         over: int = 3,
         neighbors: int = 6,
-        budget: float = 0.15,
+        budget: float = 0.30,
         candidates: int = 5,
         nepochs: float = 5,
         seed: int = 1234,
         linkage: str = "average",
         fusion: str = "product",
         consensus: bool = False,
+        start: str = "kmeans",
+        restarts: int = 10,
     ):
+        if start not in ("kmeans", "merge"):
+            raise ValueError(f"start must be 'kmeans' or 'merge', not {start!r}")
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed
         self.linkage, self.fusion, self.consensus = linkage, fusion, consensus
+        self.start, self.restarts = start, restarts
         self.decider = as_decider(decider)
         log.info("d-means decider: %s %s", type(self.decider).__name__, getattr(self.decider, "model", ""))
 
@@ -236,15 +250,22 @@ class DMeans:
                 self._record_report(len(x), 0.0)
                 return labels
         self.vocab = cards.Vocabulary(texts)
-        mc, ml = self._micro(x)
-        micro_cards = cards.build(self.vocab, texts, x, ml, len(mc))
-        group = self._merge(mc, micro_cards)
+        if self.start == "kmeans":
+            km = KMeans(self.k, n_init=self.restarts, random_state=self.seed).fit(x)
+            mc, group = km.cluster_centers_.astype(np.float32), np.arange(self.k)
+            epochs = float(km.n_iter_)
+            log.info("k-means start: %d groups, best of %d initializations, inertia %.4g", self.k, self.restarts, km.inertia_)
+        else:
+            mc, ml = self._micro(x)
+            micro_cards = cards.build(self.vocab, texts, x, ml, len(mc))
+            group = self._merge(mc, micro_cards)
+            epochs = self.engine.epochs_run
         gd = self._group_dist(x, mc, group)
         labels = gd.argmin(1)
         self.merge_labels = labels.copy()
         labels = self._settle(x, texts, gd, labels)
         self.micro_centroids, self.micro_group, self.labels = mc, group, labels
-        self._record_report(len(x), self.engine.epochs_run)
+        self._record_report(len(x), epochs)
         return labels
 
     def _record_report(self, n: int, epochs: float) -> None:

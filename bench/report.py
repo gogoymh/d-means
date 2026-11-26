@@ -182,11 +182,13 @@ def ablation_table(res: dict) -> str:
         "|:--|" + "--:|" * (len(ds) + 1),
         "| best baseline | " + " | ".join(_pct(max(res["datasets"][d]["mean"][b]["acc"] for b in BASELINES)) for d in ds) + " | 0 |",
     ]
-    order = ["geometric merge (no decisions)"] + [m for m in res["datasets"][ds[0]]["mean"] if m not in BASELINES and m != "geometric merge (no decisions)"]
+    first = res["datasets"][ds[0]]["mean"]
+    lead = [m for m in ("geometric merge (no decisions)", "k-means start only (no decisions)") if m in first]
+    order = lead + [m for m in first if m not in BASELINES and m not in lead]
     for m in order:
         means = [res["datasets"][d]["mean"][m] for d in ds]
         dpp = [v.get("decisions_per_point", 0.0) for v in means]
-        span = "0" if not any(dpp) else f"{min(dpp):.2f} to {max(dpp):.2f}"
+        span = "0" if not any(dpp) else f"{min(dpp):.2f}" if f"{min(dpp):.2f}" == f"{max(dpp):.2f}" else f"{min(dpp):.2f} to {max(dpp):.2f}"
         rows.append(f"| {'**D-means (default)**' if m == 'd-means' else m} | " + " | ".join(_pct(v["acc"]) for v in means) + f" | {span} |")
     return "\n".join(rows) + "\n\nACC (%), mean of the same seeds."
 
@@ -309,7 +311,10 @@ def render(text: str) -> str:
     blocks = {"models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     decision_results = RESULTS / "semantic-clef.json"
     if decision_results.exists():
-        blocks["semantic"] = semantic_table(json.loads(decision_results.read_text()))
+        clef = json.loads(decision_results.read_text())
+        blocks["semantic"] = semantic_table(clef)
+        if "k-means start only (no decisions)" in next(iter(clef["datasets"].values()))["runs"]:
+            blocks["ablation"] = ablation_table(clef)  # the default strategy's own ablations
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

@@ -56,7 +56,7 @@ def test_decisions_fix_what_geometry_cannot(corpus):
     x, texts, y = corpus
     c, _ = EMeans(4, nepochs=5, seed=0).fit(x)
     geo = accuracy(y, nearest(x, c)[0])
-    dm = DMeans(4, Oracle(texts, y), over=3, seed=0)
+    dm = DMeans(4, Oracle(texts, y), over=3, seed=0, start="merge")
     lab = dm.fit(x, texts)
     assert geo < 0.8
     assert accuracy(y, lab) > 0.97
@@ -66,7 +66,7 @@ def test_decisions_fix_what_geometry_cannot(corpus):
 def test_requests_have_the_documented_shape(corpus):
     x, texts, y = corpus
     oracle = Oracle(texts, y)
-    dm = DMeans(4, oracle, about="subject", budget=0.1, seed=1)
+    dm = DMeans(4, oracle, about="subject", budget=0.1, seed=1, start="merge")
     dm.fit(x, texts)
     nouls = [r for r in oracle.requests if "same" in r["questions"]]
     choices = [r for r in oracle.requests if "group" in r["questions"]]
@@ -79,6 +79,27 @@ def test_requests_have_the_documented_shape(corpus):
     c = choices[0]["questions"]["group"]
     assert c["type"] == "choice" and 2 <= len(c["criteria"]) <= 4
     assert choices[0]["state"]["text"] in texts
+
+
+def test_default_start_is_kmeans_then_settles_borderline_points(corpus):
+    from sklearn.cluster import KMeans
+
+    x, texts, y = corpus
+    oracle = Oracle(texts, y)
+    dm = DMeans(4, oracle, seed=0)
+    lab = dm.fit(x, texts)
+    km = KMeans(4, n_init=10, random_state=0).fit(x).labels_
+    assert dm.start == "kmeans" and dm.budget == 0.30
+    assert np.array_equal(dm.merge_labels, km)
+    assert dm.report["pair_decisions"] == 0
+    assert dm.report["point_decisions"] == round(0.30 * len(x))
+    assert all("group" in r["questions"] for r in oracle.requests)
+    assert accuracy(y, lab) > accuracy(y, km)
+
+
+def test_unknown_start_is_rejected():
+    with pytest.raises(ValueError):
+        DMeans(2, lambda state, question: 0.5, start="spectral")
 
 
 def test_zero_budget_asks_no_point_questions(corpus):

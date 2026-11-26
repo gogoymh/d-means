@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="650" viewBox="0 0 1080 650" role="img" aria-labelledby="title desc">
   <title id="title">From banking messages to groups by issue</title>
-  <desc id="desc">The default path uses a decision model. Split 600 messages into nine small groups, merge them into three groups using same-issue probabilities, and reconsider the 90 most ambiguous messages. All examples and scores are illustrative.</desc>
+  <desc id="desc">The default path. K-means splits 600 messages into three groups by distance, D-means finds the 180 messages closest to a boundary, and a decision model reads each of them against the group cards. Its probabilities are multiplied with a distance weight to pick the group. All examples and scores are illustrative.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#64748b" stroke-width="1.5"/></marker>
     <style>
@@ -21,12 +21,12 @@
 
   <rect x="32" y="98" width="1016" height="80" rx="12" fill="#e9eff8"/>
   <text x="52" y="123" class="label muted">DECISION MODEL</text>
-  <text x="52" y="151" class="body strong">Read representative texts. Compare their meanings.</text>
+  <text x="52" y="151" class="body strong">Reads the texts distance cannot place.</text>
   <path d="M 550 139 H 594" class="line"/>
-  <text x="612" y="130" class="body strong">Probabilities guide clustering</text>
-  <text x="612" y="156" class="small muted">Merge groups and settle ambiguous messages.</text>
-  <path d="M 60 178 V 222" class="line"/>
-  <text x="78" y="206" class="small muted">Default path: the model is used in steps 2 and 3</text>
+  <text x="612" y="130" class="body strong">Probabilities settle the boundary</text>
+  <text x="612" y="156" class="small muted">Model probability × distance weight picks the group.</text>
+  <path d="M 909 178 V 222" class="line"/>
+  <text x="700" y="206" class="small muted">The model is used in step 3</text>
 
   <rect x="32" y="230" width="318" height="324" rx="14" fill="#ffffff" stroke="#d8e0eb"/>
   <rect x="381" y="230" width="318" height="324" rx="14" fill="#ffffff" stroke="#d8e0eb"/>
@@ -35,41 +35,39 @@
   <path d="M 703 391 H 725" class="line"/>
 
   <text x="52" y="262" class="label muted">01 / SPLIT BY DISTANCE</text>
-  <text x="52" y="294" class="step">600 texts → 9 small groups</text>
-  <text x="52" y="322" class="small muted">Each gets words + example texts.</text>
-  <rect x="52" y="343" width="278" height="50" rx="8" fill="#f1f4f9"/>
-  <text x="66" y="374" class="body"><tspan class="strong">A</tspan><tspan dx="14">transfer fee, charged</tspan></text>
-  <rect x="52" y="405" width="278" height="50" rx="8" fill="#f1f4f9"/>
-  <text x="66" y="436" class="body"><tspan class="strong">B</tspan><tspan dx="14">sending money, cost</tspan></text>
-  <rect x="52" y="467" width="278" height="50" rx="8" fill="#f1f4f9"/>
-  <text x="66" y="498" class="body"><tspan class="strong">C</tspan><tspan dx="14">transfer still pending</tspan></text>
-  <text x="52" y="539" class="small muted">3 of the 9 group cards shown</text>
+  <text x="52" y="294" class="step">600 texts → 3 groups</text>
+  <text x="52" y="322" class="small muted">K-means, best of 10 starts.</text>
+  <rect x="52" y="343" width="278" height="50" rx="8" fill="#d9f2e8"/>
+  <text x="66" y="374" class="body" style="fill:#166552"><tspan class="strong">1</tspan><tspan dx="14">transfer, fee, charged</tspan></text>
+  <rect x="52" y="405" width="278" height="50" rx="8" fill="#e0e9ff"/>
+  <text x="66" y="436" class="body" style="fill:#304f9c"><tspan class="strong">2</tspan><tspan dx="14">transfer, pending, arrived</tspan></text>
+  <rect x="52" y="467" width="278" height="50" rx="8" fill="#f3e5fc"/>
+  <text x="66" y="498" class="body" style="fill:#794598"><tspan class="strong">3</tspan><tspan dx="14">card, lost, stolen</tspan></text>
+  <text x="52" y="539" class="small muted">Each group gets a card: words + examples</text>
 
-  <text x="401" y="262" class="label muted">02 / MERGE BY MEANING</text>
-  <text x="401" y="294" class="step">9 groups → 3 groups</text>
-  <text x="401" y="322" class="small muted">Ask the model: “Same issue?”</text>
-  <text x="401" y="360" class="body strong">A + B</text>
-  <text x="485" y="360" class="body">0.96</text>
-  <text x="549" y="360" class="small" style="fill:#166552">Both about fees</text>
-  <text x="401" y="390" class="body strong">A + C</text>
-  <text x="485" y="390" class="body">0.08</text>
-  <text x="549" y="390" class="small muted">Different issues</text>
-  <path d="M 540 408 V 429" class="line"/>
-  <rect x="401" y="442" width="278" height="27" rx="6" fill="#d9f2e8"/>
-  <text x="415" y="462" class="small strong" style="fill:#166552">Transfer fees (includes A + B)</text>
-  <rect x="401" y="477" width="278" height="27" rx="6" fill="#e0e9ff"/>
-  <text x="415" y="497" class="small strong" style="fill:#304f9c">Transfer delays (includes C)</text>
-  <rect x="401" y="512" width="278" height="27" rx="6" fill="#f3e5fc"/>
-  <text x="415" y="532" class="small strong" style="fill:#794598">Lost cards</text>
+  <text x="401" y="262" class="label muted">02 / FIND THE AMBIGUOUS</text>
+  <text x="401" y="294" class="step">180 messages flagged</text>
+  <text x="401" y="322" class="small muted">The 30% closest to a boundary.</text>
+  <rect x="401" y="343" width="278" height="78" rx="8" fill="#f1f4f9"/>
+  <text x="417" y="373" class="body strong">“Why was I charged</text>
+  <text x="417" y="399" class="body strong">to send money?”</text>
+  <text x="401" y="452" class="small muted">Distance to group 2: 0.41</text>
+  <text x="401" y="478" class="small muted">Distance to group 1: 0.43</text>
+  <text x="401" y="530" class="small" style="fill:#304f9c">Nearest by distance: delays</text>
 
-  <text x="750" y="262" class="label muted">03 / RECHECK AMBIGUOUS TEXTS</text>
-  <text x="750" y="294" class="step">90 messages reconsidered</text>
-  <text x="750" y="322" class="small muted">The closest 15% to a boundary.</text>
-  <rect x="750" y="343" width="278" height="78" rx="8" fill="#f1f4f9"/>
-  <text x="766" y="373" class="body strong">“Why was I charged</text>
-  <text x="766" y="399" class="body strong">to send money?”</text>
-  <text x="750" y="452" class="small muted">Distance favours transfer delays.</text>
-  <text x="750" y="478" class="small muted">Model + distance favour fees.</text>
+  <text x="750" y="262" class="label muted">03 / ASK THE MODEL</text>
+  <text x="750" y="294" class="step">Which group fits?</text>
+  <text x="750" y="322" class="small muted">One Choice over the nearest cards.</text>
+  <text x="750" y="362" class="body strong">Fees</text>
+  <text x="848" y="362" class="body">0.85 × 0.80</text>
+  <text x="980" y="362" class="body strong" style="fill:#166552">0.68</text>
+  <text x="750" y="394" class="body strong">Delays</text>
+  <text x="848" y="394" class="body">0.10 × 1.00</text>
+  <text x="980" y="394" class="body">0.10</text>
+  <text x="750" y="426" class="body strong">Cards</text>
+  <text x="848" y="426" class="body">0.05 × 0.05</text>
+  <text x="980" y="426" class="body">0.00</text>
+  <text x="750" y="470" class="small muted">Model probability × distance weight</text>
   <rect x="750" y="501" width="278" height="38" rx="8" fill="#d9f2e8"/>
   <text x="766" y="527" class="body strong" style="fill:#166552">Assign to transfer fees</text>
 

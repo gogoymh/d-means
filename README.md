@@ -61,22 +61,71 @@ The TREC and StackExchange convergence plot uses Jev 1.14 with consensus disable
 
 ## How it works
 
-For corpora with enough lexical variation, d-means compares partition agreement between the embeddings and a low-rank TF-IDF representation. If adjusted mutual information is at least one third, it clusters the documents using both representations. Otherwise it follows the decision-model path below. Set `consensus=False` to use the decision-model path for every fit.
+d-means takes **texts, their embedding vectors, and a target number of groups `k`**. The `about` instruction tells the decision model what makes two texts belong together, such as the customer's banking issue.
 
-```mermaid
-flowchart LR
-  T[texts + embeddings] --> M["e-means<br/>3k micro-clusters"]
-  M --> N["Noul per neighbour pair<br/><i>same about?</i>"]
-  N --> L["average linkage on 1 - p<br/>exactly k groups"]
-  L --> C["Choice for the 15%<br/>most borderline points"]
-  C --> F["x geometric prior<br/>final labels"]
+By default, it first groups the corpus in two ways: by embedding similarity and by the words the texts use. If those groupings agree enough, it combines the two representations and returns `k` groups **without calling the decision model**. If they disagree, or the word-based check cannot run, it takes the three steps below. Set `consensus=False` to always take this path.
+
+<p align="center">
+  <img src="assets/how-it-works.svg" alt="Illustrative banking example: split 600 messages into nine small groups; judge whether nearby groups describe the same issue and merge into three groups; then reconsider the 90 most ambiguous messages. Two transfer-fee groups receive a high same-issue probability, while a transfer-delay group receives a low one. An ambiguous message is assigned to transfer fees after combining model and distance scores." width="1080">
+</p>
+
+### Example: sort 600 banking messages into 3 groups
+
+Suppose the messages cover transfer fees, delayed transfers, and lost cards. Two messages can both mention a *transfer* but describe different issues. Two others can describe the same fee using different words. Distance alone can mix them up.
+
+For this walkthrough, force the decision path:
+
+```python
+from dmeans import DMeans
+from dmeans.deciders import Decisions
+
+model = DMeans(k=3, decider=Decisions("cloudflare/clef"),
+               about="customer's banking issue", consensus=False)
+labels = model.fit(embeddings, texts)  # 600 vectors and their 600 messages
 ```
 
-1. **Over-cluster.** e-means splits the data into `3k` micro-clusters. They are much purer than `k` clusters.
-2. **Merge by decision.** Each micro-cluster becomes a card: its most distinctive words (class-based TF-IDF) and the four texts nearest its centroid. For every micro-cluster and its six nearest neighbours, the decision model answers one Noul: *do these two groups share the same `about`?* Pairs it was not asked get an isotonic prior fitted on the pairs it was asked. Average linkage on `1 - p` joins the micro-clusters into exactly `k` groups.
-3. **Settle the borderline.** The 15% of points with the smallest margin between their two nearest groups get one Choice over their five nearest groups. The model's probabilities are multiplied by the geometric posterior and the point takes the argmax.
+The groups, probabilities, and scores below are illustrative, not benchmark outputs. The algorithm returns numeric labels; names such as "transfer fees" explain the example, and are not supplied as a predefined list of categories.
 
-Decisions cost about 0.3 to 0.4 per point. At Jev's measured $0.0000265 per decision, a TREC run costs $0.004 and a StackExchange run $0.033.
+**1. Start with small groups.** e-means first makes `3 × k = 9` micro-clusters: small groups of nearby vectors. This gives the next step smaller pieces to merge. Each group gets a **card** containing distinctive words and up to four representative messages. Three of the nine cards might look like this:
+
+| Card | Typical words | Example message |
+|:--|:--|:--|
+| A | transfer, fee, charged | "Why was I charged a transfer fee?" |
+| B | sending, money, cost | "Does sending money cost extra?" |
+| C | transfer, pending, arrived | "My transfer still hasn't arrived." |
+
+**2. Ask which groups belong together.** For each small group and its six nearest neighbours, the model reads the two cards and answers: *Do these describe the same customer's banking issue?* This yes/no probability question is called a **Noul** in the API.
+
+| Pair | Example probability of the same issue | Effect on merging |
+|:--|--:|:--|
+| A + B | 0.96 | Strong evidence to group the two fee clusters together |
+| A + C | 0.08 | Strong evidence to keep fees and delays apart |
+
+d-means uses all pair scores to merge the nine small groups into exactly three groups. It repeatedly joins the groups with the smallest average `1 − probability` between their members. The two rows above are evidence for that process, not independent yes/no merge rules.
+
+**3. Reconsider the ambiguous messages.** After merging, each message starts in its nearest group. d-means selects the 15% whose distances to their two closest groups are most similar: **90 of these 600 messages**. For each, it asks the model to choose among the nearest groups, showing their cards. This multiple-option question is a **Choice** in the API.
+
+For *"Why was I charged to send money?"*, suppose distance slightly favours transfer delays. d-means multiplies the model's probability by a distance-based weight:
+
+| Candidate group | Model probability | Distance weight | Product |
+|:--|--:|--:|--:|
+| Transfer fees | 0.85 | 0.80 | **0.6800** |
+| Transfer delays | 0.10 | 1.00 | 0.1000 |
+| Lost cards | 0.05 | 0.05 | 0.0025 |
+
+The largest product wins, so this message moves to **transfer fees**. The other 510 messages keep their assignments from the merge step. Both the model's reading and the vector distances influence the final choice.
+
+<details><summary>Exact defaults and implementation details</summary>
+
+- **Consensus check:** compare separate k-means partitions of unit-normalized embeddings and a low-rank TF-IDF representation using adjusted mutual information (AMI). A score of at least `1/3` triggers a fresh k-means fit on `[embedding, 0.3 × lexical]`. The check is skipped if there are too few usable lexical dimensions. `about` is used only on the decision path.
+- **Small groups:** `over=3`; the initial count is `min(3k, max(k, n // 4))`, with empty groups dropped. Cards use class-based TF-IDF keywords and up to four texts nearest the group's mean vector.
+- **Pair scoring:** `neighbors=6`, capped at the number of other micro-clusters, with duplicate pairs asked once. Unasked pairs get probabilities estimated from centroid cosine similarity, calibrated against the model's answers by isotonic regression. Average-linkage clustering on `1 − p` produces `k` groups.
+- **Point selection:** `budget=0.15`; ask about `round(0.15 × n)` points with the smallest gap between their two nearest group distances. A group's distance is the minimum squared distance to one of its micro-cluster centroids.
+- **Final choice:** `candidates=5`, capped at `k`. For each candidate, the distance weight is `exp(−(distance − closest_distance) / tau)`, where `tau` is the median gap across the corpus (or `1e-6` if zero). Multiply this by the model probability (with `1e-6` smoothing) and take the largest score. The example omits smoothing in the displayed arithmetic.
+
+`model.partition_source` shows `"consensus"` or `"decision"`. `model.report` records pair decisions, point decisions, and points moved. Model calls depend on the path and settings; the consensus path uses zero.
+
+</details>
 
 ## Quick start
 

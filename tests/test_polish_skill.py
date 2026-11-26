@@ -141,3 +141,51 @@ def test_checklist_covers_new_patterns():
     items = "\n".join(re.findall(r"(?m)^-\s*\[\s\]\s+.+$", _read_skill()))
     for phrase in ("을(를)", "진행하다", "done", "피동"):
         assert phrase in items, phrase
+
+
+def _frontmatter_description() -> str:
+    match = re.match(r"^---\n(.*?)\n---\n", _read_skill(), flags=re.DOTALL)
+    assert match is not None
+    line = re.search(r"(?m)^description:[ \t]*(.*)$", match.group(1))
+    assert line is not None, "frontmatter must set description"
+    return line.group(1).strip()
+
+
+def test_description_is_quoted_and_whole():
+    raw = _frontmatter_description()
+    # A plain YAML scalar ends at " #", so the value must be a single double-quoted string.
+    assert raw.startswith('"') and raw.endswith('"') and len(raw) > 2, raw
+    inner = raw[1:-1]
+    assert not re.search(r'(?<!\\)"', inner), f"unescaped quote inside description: {raw}"
+    for phrase in ("#general", "을(를)", "영어 섞기", "가이드입니다."):
+        assert phrase in inner, phrase
+
+
+def test_rewrites_use_one_register():
+    for kind, label, body in re.findall(r"(?m)^-\s*(원문|고친 예)([^:\n]*):\s*\n?\s*`([^`]+)`", _read_skill()):
+        if kind != "고친 예":
+            continue
+        after = body.strip()
+        sentences = [s.strip() for s in re.split(r"(?<=[.?!])\s+", after) if s.strip()]
+        if after.endswith("하기"):  # issue titles are not sentences
+            continue
+        assert sentences and all(s.endswith("니다.") for s in sentences), f"rewrite not in polite register: {after}"
+
+
+def test_register_rule_matches_rewrites():
+    text = _read_skill()
+    rule = next(l for l in text.splitlines() if "종결어미 통일" in l)
+    assert "완료 기준" in rule and "합쇼체" in rule
+    assert "평서체" not in rule, rule
+    assert "~하기" in rule, "the rule must name the single exception for issue titles"
+    titles = [a for b, a in _pairs(text) if a.endswith("하기")]
+    assert len(titles) == 1, titles
+
+
+def test_judge_particle_cases():
+    pairs = _pairs(_block_with(_read_skill(), "을(를)", "(으)로", "받침"))
+    expected = {"DM-31(으)로": "DM-31을 맡았습니다.", "DM-31을(를)": "DM-31을 마쳐", "DM-34(으)로": "DM-34를 맡았습니다."}
+    for before_part, after_part in expected.items():
+        assert any(before_part in b and after_part in a for b, a in pairs), before_part
+    for _, after in pairs:
+        assert not re.search(r"\((?:를|을|으|는|은|가|이)\)", after), after

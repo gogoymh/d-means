@@ -10,6 +10,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from statistics import mean
 
 from . import chart
 from .semantic import ANSWERS, BASELINES, MODEL, MODELS, RESULTS, losses, paths
@@ -145,42 +146,36 @@ def model_results() -> dict[str, dict]:
     return out
 
 
-def models_table(results: dict[str, dict]) -> str:
-    """d-means ACC with each decision model, on every dataset any model has run; "-" where a model has not."""
-    from .semantic import DATASETS
-
-    ds = [d for d in DATASETS if any(d in r["datasets"] for r in results.values())]
-    base = {d: next(r["datasets"][d]["mean"] for r in results.values() if d in r["datasets"]) for d in ds}
-    acc = {m: {d: r["datasets"][d]["mean"]["d-means"]["acc"] for d in ds if d in r["datasets"]} for m, r in results.items()}
-    floor = {d: max(base[d][b]["acc"] for b in BASELINES) for d in ds}
-    top = {d: max([floor[d]] + [a[d] for a in acc.values() if d in a]) for d in ds}
-
-    def cell(v: float, d: str) -> str:
-        return f"**{_pct(v)}**" if v == top[d] else _pct(v)
-
-    rows = [
-        "| Decision model | " + " | ".join(_name(d) for d in ds) + " | wins | cost / decision | answers committed |",
-        "|:--|" + "--:|" * (len(ds) + 3),
-        "| none (best baseline) | " + " | ".join(cell(floor[d], d) for d in ds) + " | - | $0 | - |",
-    ]
-    for m, r in results.items():
-        cells = [cell(acc[m][d], d) if d in acc[m] else "-" for d in ds]
-        wins = sum(acc[m][d] > floor[d] for d in acc[m])
-        usd = r.get("usd_per_decision") or {}
-        rates = [usd[d] for d in acc[m] if isinstance(usd, dict) and d in usd]
-        rate = "-" if not rates else (f"${min(rates) * 1e6:.0f}" if len(rates) == 1 else f"${min(rates) * 1e6:.0f} to {max(rates) * 1e6:.0f}") + " per 1M decisions"
-        n = r.get("jev_answers", 0)
-        rows.append(f"| {MODELS.get(m, m)} (`{m}`) | " + " | ".join(cells) + f" | {wins} of {len(acc[m])} | {rate} | [{n:,}](bench/results/{paths(m)[0].name}) |")
-    seeds = ", ".join(map(str, results[MODEL]["seeds"]))
-    others = [m for m in results if m != MODEL]
-    replay = " ".join(f"`bench.semantic --model {m} --verify` replays {MODELS.get(m, m)} offline." for m in others)
-    return (
-        "\n".join(rows)
-        + f"\n\nd-means ACC (%), mean of seeds {seeds}. Same embeddings, seeds, questions and defaults; only the model answering them changes. "
-        + "*Wins* counts datasets where d-means beats the best baseline. *Cost* is OpenRouter's billed `usage.cost` per decision on the live run. "
-        + replay
-    )
-
+def models_table(study: dict) -> str:
+    """Render complete model comparisons from the per-seed study results."""
+    ds = list(NAMES)
+    sections = []
+    baseline = {
+        d: max(mean(row["acc"] for row in study["baselines"][d][m]) for m in BASELINES)
+        for d in ds
+    }
+    for mode, title in (
+        ("adaptive", "Default strategy"),
+        ("decision_only", "Decision model on every dataset"),
+    ):
+        models = study["strategies"][mode]
+        rows = [
+            f"#### {title}",
+            "",
+            "| Dataset | Best baseline | " + " | ".join(MODELS[m] for m in models) + " |",
+            "|:--|--:|" + "--:|" * len(models),
+        ]
+        for d in ds:
+            scores = [mean(row["acc"] for row in datasets[d]["scores"]) for datasets in models.values()]
+            values = [baseline[d], *scores]
+            best = max(values)
+            cells = [f"**{v * 100:.2f}**" if v == best else f"{v * 100:.2f}" for v in values]
+            for i, datasets in enumerate(models.values(), start=1):
+                if datasets[d]["policy_abstentions"]:
+                    cells[i] += " †"
+            rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
+        sections.append("\n".join(rows))
+    return "\n\n".join(sections)
 
 def ablation_table(res: dict) -> str:
     ds = list(res["datasets"])
@@ -311,7 +306,7 @@ def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
     models = model_results()
     widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
-    blocks = {"semantic": semantic_table(models[widest]), "models": models_table(models), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
+    blocks = {"semantic": semantic_table(models[widest]), "models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     consensus = RESULTS / "semantic-consensus-clef.json"
     if consensus.exists():
         blocks["consensus"] = semantic_table(json.loads(consensus.read_text()), consensus=True)

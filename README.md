@@ -169,19 +169,35 @@ DMeans(k, decider=lambda state, question: ...)                # your own functio
 
 ### Decision models
 
-The decision-only benchmark (`consensus=False`), with the model that answers the questions swapped:
+Both tables report clustering accuracy (%), averaged over seeds 0, 1, and 2. The best baseline is the highest mean among k-means, e-means, and o-means.
 
 <!-- bench:models -->
-| Decision model | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | wins | cost / decision | answers committed |
-|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| none (best baseline) | 58.1 | 37.6 | **83.7** | **86.9** | **56.9** | 61.1 | - | $0 | - |
-| Jev 1.14 (`typesafe/jev-1.14`) | 65.9 | 42.3 | - | - | - | - | 2 of 2 | $26 to 27 per 1M decisions | [8,866](bench/results/jev-answers.jsonl.gz) |
-| Clef (`cloudflare/clef`) | **66.8** | **42.4** | 70.0 | 70.2 | 47.2 | **63.5** | 3 of 6 | $87 to 248 per 1M decisions | [35,257](bench/results/clef-answers.jsonl.gz) |
+#### Default strategy
 
-d-means ACC (%), mean of seeds 0, 1, 2. Same embeddings, seeds, questions and defaults; only the model answering them changes. *Wins* counts datasets where d-means beats the best baseline. *Cost* is OpenRouter's billed `usage.cost` per decision on the live run. `bench.semantic --model cloudflare/clef --verify` replays Clef offline.
+| Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 |
+|:--|--:|--:|--:|--:|
+| TREC | 58.13 | **66.80** | 59.60 | 65.93 |
+| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 |
+| AG News | 83.75 | **84.05** | **84.05** | **84.05** |
+| BBC News | 86.90 | **95.60** | **95.60** | **95.60** |
+| 20 Newsgroups | 56.85 | **57.17** | **57.17** | **57.17** |
+| Banking77 | 61.14 | **63.54** | 61.75 | 60.65 |
+
+#### Decision model on every dataset
+
+| Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 |
+|:--|--:|--:|--:|--:|
+| TREC | 58.13 | **66.80** | 59.60 | 65.93 |
+| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 |
+| AG News | **83.75** | 70.01 | 72.47 | 72.52 |
+| BBC News | 86.90 | 70.17 | **96.73** | 94.80 |
+| 20 Newsgroups | **56.85** | 47.21 | 52.02 † | 49.87 |
+| Banking77 | 61.14 | **63.54** | 61.75 | 60.65 |
 <!-- /bench:models -->
 
-Clef edges Jev where both ran and wins Banking77 (k=77). On AG News, BBC News and 20 Newsgroups, the geometric merge already trails the best baseline. See the [stage-by-stage results](#where-d-means-loses).
+The default strategy took the embedding–lexical consensus path on AG News, BBC News, and 20 Newsgroups in all three runs. These rows have the same scores for every model. The second table uses `consensus=False`.
+
+† Gemini declined three requests on 20 Newsgroups. The run used 0.5 for declined yes/no questions and equal probabilities for any declined choice question. [Per-seed ACC, NMI, and ARI](bench/results/decision-model-comparison.json).
 
 ## Benchmark
 

@@ -32,7 +32,7 @@ from . import data, embed
 log = _log.get("bench.semantic")
 RESULTS = Path(__file__).resolve().parent / "results"
 MODEL = "typesafe/jev-1.14"  # default for the legacy semantic benchmark
-MODELS = {MODEL: "Jev 1.14", "cloudflare/clef": "Clef", "cloudflare/clef-flash": "Clef-flash"}
+MODELS = {MODEL: "Jev 1.14", "cloudflare/clef": "Clef", "cloudflare/clef-flash": "Clef-flash", "google/gemini-decision-1": "Gemini Decision 1"}
 DATASETS = ["trec", "stackexchange", "ag-news", "bbc-news", "20-newsgroups", "banking77"]  # every loader in bench/data.py
 SEEDS = [0, 1, 2]
 BASELINES = ["k-means", "e-means", "o-means"]

@@ -1,7 +1,6 @@
 """The README banner: a letter D of clustered spheres, in light and dark variants."""
 
 import importlib.util
-import re
 from pathlib import Path
 
 import numpy as np
@@ -84,10 +83,13 @@ def test_corners_are_denser(theme):
     assert (nearest == dominant).mean() >= 0.95
 
 
-def test_readme_shows_dark_and_light_banners():
+def test_readme_shows_hero_banner():
     head = (ROOT / "README.md").read_text().split("</h1>")[0]
-    assert re.search(r'<source media="\(prefers-color-scheme: dark\)" srcset="assets/d-means-banner-dark.png">', head)
-    assert '<img src="assets/d-means-banner.png"' in head
+    assert '<img src="assets/d-means-hero.jpg"' in head
+    assert (ASSETS / "d-means-hero.jpg").is_file()
+
+
+def test_generated_banner_theme_dimensions_and_brightness():
     light, dark = luma(load("light")) / 255, luma(load("dark")) / 255
     assert light.shape == dark.shape == (512, 1536)
     assert light.mean() > 0.75 and dark.mean() < 0.2, (light.mean(), dark.mean())

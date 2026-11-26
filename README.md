@@ -1,12 +1,8 @@
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/d-means-banner-dark.png">
-    <img src="assets/d-means-banner.png" alt="D-means beside an enlarged D formed by amber, violet, and teal sphere clusters" width="960">
-  </picture>
+  <img src="assets/d-means-hero.jpg" alt="d-means: k-means that asks before it guesses. A sculpted D with three clusters of spheres." width="960">
 </h1>
 
 <p align="center">
-  <b>k-means that asks before it guesses.</b><br>
   Geometry decides <i>how far</i>. A typed decision model decides <i>what kind</i>.
 </p>
 

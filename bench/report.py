@@ -55,7 +55,7 @@ def _and(items: list[str]) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
-def summary(res: dict) -> str:
+def summary(res: dict, *, consensus: bool = False) -> str:
     """One generated paragraph: where d-means wins, where it trails, and what backs the numbers."""
     ds = list(res["datasets"])
     lost = losses(res)
@@ -65,7 +65,9 @@ def summary(res: dict) -> str:
         if all(r["acc"] > max(res["datasets"][d]["runs"][b][i]["acc"] for b in BASELINES) for i, r in enumerate(res["datasets"][d]["runs"]["d-means"]))
     ]
     out = f"d-means beats the best baseline on ACC, NMI and ARI on {len(wins)} of {len(ds)} datasets"
-    out += f" ({_and([_name(d) for d in every_seed])} on every seed)." if every_seed else "."
+    out += "."
+    if every_seed:
+        out += f" ACC leads on every seed for {_and([_name(d) for d in every_seed])}."
     trails = []
     for d in ds:
         if lost[d]:
@@ -79,12 +81,12 @@ def summary(res: dict) -> str:
     if n is None and model == MODEL and ANSWERS.exists():
         with gzip.open(ANSWERS, "rt") as f:
             n = sum(1 for _ in f)
-    if n:
+    if n and not consensus:
         out += f" Every d-means number comes from {MODELS.get(model, model)} answers through OpenRouter ({n:,} decisions, committed in [`bench/results/{answers.name}`](bench/results/{answers.name}))."
     return out
 
 
-def semantic_table(res: dict) -> str:
+def semantic_table(res: dict, *, consensus: bool = False) -> str:
     ds = list(res["datasets"])
     model = res.get("jev_model", MODEL)
     headers = [method.replace("-", "&#8209;") for method in METHODS]
@@ -101,6 +103,8 @@ def semantic_table(res: dict) -> str:
         r = res["datasets"][d]
         usd = _usd(res, d)
         cost = "-" if usd is None else f"${usd:.3f}"
+        if consensus and not r["mean"]["d-means"]["decisions"]:
+            cost = "$0"
         rows.append(f"| {_name(d)} | " + " | ".join(_cells(r["mean"], "acc")) + " |")
         run_details.append(
             f"| {_name(d)} | {r['n']:,} | {r['k']} | {_delta(r['mean'], 'acc')} | {cost} |"
@@ -113,10 +117,16 @@ def semantic_table(res: dict) -> str:
         mean = res["datasets"][d]["mean"]
         detail.append(f"| {_name(d)} | " + " | ".join(_cells(mean, "nmi") + _cells(mean, "ari")) + " |")
     seeds = ", ".join(map(str, res["seeds"]))
+    model_name = MODELS.get(model, model)
+    if consensus:
+        evidence = f"d-means uses embedding–lexical consensus where the views agree and {model_name} otherwise. "
+    else:
+        evidence = f"d-means uses {model_name}. "
     return (
         "\n".join(rows)
-        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. d-means uses {MODELS.get(model, model)}. "
-        + summary(res)
+        + f"\n\nClustering accuracy (%), mean of seeds {seeds}. "
+        + evidence
+        + summary(res, consensus=consensus)
         + "\n\n<details><summary>Run details, NMI and ARI</summary>\n\n"
         + "\n".join(run_details)
         + "\n\nLead is the accuracy difference from the best baseline, in percentage points.\n\n"
@@ -302,6 +312,9 @@ def render(text: str) -> str:
     models = model_results()
     widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
     blocks = {"semantic": semantic_table(models[widest]), "models": models_table(models), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
+    consensus = RESULTS / "semantic-consensus-clef.json"
+    if consensus.exists():
+        blocks["consensus"] = semantic_table(json.loads(consensus.read_text()), consensus=True)
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

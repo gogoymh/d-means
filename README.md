@@ -15,7 +15,50 @@
 
 k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means) all cut embedding space by distance alone. e-means and o-means make that cut **faster**. None of them can make it **right** when distance is wrong: two categories that sit close together get merged, one category that is spread out gets split, and points between two centroids are a coin flip.
 
-**d-means** keeps the fast geometry (it runs on e-means) and hands the two decisions geometry cannot make to a decision model of your choice, which reads the texts and answers typed questions with probabilities: a typed decision model such as TypeSafe's [Jev](https://docs.typesafe.ai) or Cloudflare's open-weight [Clef](https://blog.cloudflare.com/clef-decision-models), any chat LLM, or your own function. The table below uses Clef, which was evaluated on all six datasets. [See the results by decision model](#decision-models).
+**d-means** starts by comparing independent clusters from the embeddings and the words in each text. When they agree, it fits a joint representation at the document level. Otherwise, it asks a decision model which micro-clusters to merge and where to place borderline texts. The decision model can be [Jev](https://docs.typesafe.ai), [Clef](https://blog.cloudflare.com/clef-decision-models), a chat LLM, or your own function.
+
+### Semantic clustering benchmark
+
+<!-- bench:consensus -->
+| Dataset | k&#8209;means | e&#8209;means | o&#8209;means | **d&#8209;means** |
+|:--|--:|--:|--:|--:|
+| TREC | 55.6 | 58.1 | 58.1 | **66.8** |
+| StackExchange | 37.6 | 33.7 | 34.8 | **42.4** |
+| AG News | 83.7 | 83.5 | 83.5 | **84.1** |
+| BBC News | 86.5 | 86.9 | 86.9 | **95.6** |
+| 20 Newsgroups | 56.9 | 49.3 | 52.4 | **57.2** |
+| Banking77 | 61.1 | 58.9 | 59.4 | **63.5** |
+
+Clustering accuracy (%), mean of seeds 0, 1, 2. d-means uses embedding–lexical consensus where the views agree and Clef otherwise. d-means beats the best baseline on ACC, NMI and ARI on 6 of 6 datasets. ACC leads on every seed for TREC, StackExchange, AG News and Banking77.
+
+<details><summary>Run details, NMI and ARI</summary>
+
+| Dataset | Texts | Clusters | Lead (pp) | Cost/run |
+|:--|--:|--:|--:|--:|
+| TREC | 500 | 6 | +8.7 | $0.014 |
+| StackExchange | 3,000 | 50 | +4.8 | $0.115 |
+| AG News | 7,600 | 4 | +0.3 | $0 |
+| BBC News | 1,000 | 5 | +8.7 | $0 |
+| 20 Newsgroups | 7,299 | 20 | +0.3 | $0 |
+| Banking77 | 3,080 | 77 | +2.4 | $0.123 |
+
+Lead is the accuracy difference from the best baseline, in percentage points.
+
+| Dataset | k-means NMI | e-means NMI | o-means NMI | d-means NMI | k-means ARI | e-means ARI | o-means ARI | d-means ARI |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 41.3 | 45.7 | 45.7 | **50.5** | 38.0 | 42.2 | 42.2 | **47.3** |
+| StackExchange | 48.1 | 46.0 | 46.8 | **52.1** | 23.1 | 18.6 | 20.7 | **28.9** |
+| AG News | 59.9 | 60.1 | 60.1 | **61.3** | 62.8 | 62.4 | 62.4 | **63.5** |
+| BBC News | 80.9 | 82.0 | 82.0 | **86.7** | 79.2 | 80.2 | 80.2 | **89.5** |
+| 20 Newsgroups | 56.9 | 55.4 | 56.1 | **58.1** | 40.1 | 38.4 | 39.4 | **41.7** |
+| Banking77 | 80.3 | 80.5 | 80.6 | **85.2** | 51.2 | 50.3 | 50.7 | **56.5** |
+
+</details>
+<!-- /bench:consensus -->
+
+We developed the consensus strategy on these six datasets. The comparison uses the original baseline settings, including one initialization for k-means and eight for each embedding-based consensus fit. The results measure performance on the development benchmarks. [See the per-seed results](bench/results/semantic-consensus-clef.json).
+
+<details><summary>Previous results with Clef and no consensus check</summary>
 
 <!-- bench:semantic -->
 | Dataset | k&#8209;means | e&#8209;means | o&#8209;means | **d&#8209;means** |
@@ -27,7 +70,7 @@ k-means, [e-means](https://arxiv.org/abs/2611.09501) and [o-means](https://githu
 | 20 Newsgroups | **56.9** | 49.3 | 52.4 | 47.2 |
 | Banking77 | 61.1 | 58.9 | 59.4 | **63.5** |
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. d-means uses Clef. d-means beats the best baseline on ACC, NMI and ARI on 3 of 6 datasets (TREC, StackExchange and Banking77 on every seed). It trails on AG News (ACC -13.7, NMI -1.5, ARI -8.7), BBC News (ACC -16.7, NMI -6.8, ARI -16.4) and 20 Newsgroups (ACC -9.6, NMI -1.0, ARI -3.1); [why](#where-d-means-loses). Every d-means number comes from Clef answers through OpenRouter (35,257 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
+Clustering accuracy (%), mean of seeds 0, 1, 2. d-means uses Clef. d-means beats the best baseline on ACC, NMI and ARI on 3 of 6 datasets. ACC leads on every seed for TREC, StackExchange and Banking77. It trails on AG News (ACC -13.7, NMI -1.5, ARI -8.7), BBC News (ACC -16.7, NMI -6.8, ARI -16.4) and 20 Newsgroups (ACC -9.6, NMI -1.0, ARI -3.1); [why](#where-d-means-loses). Every d-means number comes from Clef answers through OpenRouter (35,257 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
 
 <details><summary>Run details, NMI and ARI</summary>
 
@@ -54,13 +97,17 @@ Lead is the accuracy difference from the best baseline, in percentage points.
 </details>
 <!-- /bench:semantic -->
 
+</details>
+
 <p align="center">
   <img src="assets/clustering-comparison.png" alt="Four plots comparing the clustering accuracy of k-means, e-means, o-means and d-means as effective passes increase on TREC and StackExchange." width="960">
 </p>
 
-The TREC and StackExchange convergence plot uses Jev 1.14. Each marker is the mean of three runs, and pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
+The TREC and StackExchange convergence plot uses Jev 1.14 with consensus disabled. Each marker is the mean of three runs, and pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
 
 ## How it works
+
+For corpora with enough lexical variation, d-means compares partition agreement between the embeddings and a low-rank TF-IDF representation. If adjusted mutual information is at least one third, it clusters the documents using both representations. Otherwise it follows the decision-model path below. Set `consensus=False` to use the decision-model path for every fit.
 
 ```mermaid
 flowchart LR
@@ -122,7 +169,7 @@ DMeans(k, decider=lambda state, question: ...)                # your own functio
 
 ### Decision models
 
-The same benchmark, with only the model that answers the questions swapped:
+The decision-only benchmark (`consensus=False`), with the model that answers the questions swapped:
 
 <!-- bench:models -->
 | Decision model | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | wins | cost / decision | answers committed |
@@ -139,7 +186,8 @@ Clef edges Jev where both ran and wins Banking77 (k=77). On AG News, BBC News an
 ## Benchmark
 
 ```bash
-uv run python -m bench.semantic --verify   # offline replay of the committed Jev answers
+uv run python -m bench.semantic --model cloudflare/clef --consensus --verify  # current default strategy
+uv run python -m bench.semantic --verify   # offline replay of the legacy Jev results
 uv run python -m bench.semantic --model cloudflare/clef --verify   # the same for Clef
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
@@ -184,7 +232,7 @@ ACC (%) after each stage of a default run with Clef, mean of the same seeds. *Pu
 
 The same micro-clusters merged by geometry alone gain little. The decisions carry the gain, and each stage adds to it.
 
-**Convergence.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,298 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where o-means draws over e-means, it scans every cell at that k.
+**Convergence with consensus disabled.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,298 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where o-means draws over e-means, it scans every cell at that k.
 
 <!-- bench:convergence -->
 <picture>

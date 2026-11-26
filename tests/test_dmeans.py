@@ -89,3 +89,25 @@ def test_zero_budget_asks_no_point_questions(corpus):
     assert dm.report["point_decisions"] == 0
     assert set(np.unique(lab)) <= set(range(4))
     assert np.array_equal(lab, dm.merge_labels)
+
+
+
+def test_consensus_resolves_agreeing_views_without_model_requests():
+    rng = np.random.default_rng(11)
+    topics = [
+        "river lake water stream ocean",
+        "violin viola cello viola strings",
+        "bread flour dough baker yeast",
+    ]
+    truth = np.repeat(np.arange(len(topics)), 24)
+    x = np.eye(len(topics), dtype=np.float32)[truth] + rng.normal(0, 0.02, (len(truth), len(topics)))
+    texts = [topics[group] for group in truth]
+    oracle = Oracle(texts, truth)
+
+    dm = DMeans(len(topics), oracle, seed=0)
+    labels = dm.fit(x, texts)
+
+    assert accuracy(truth, labels) == 1.0
+    assert dm.partition_source == "consensus"
+    assert dm.report["decisions"] == 0
+    assert oracle.requests == []

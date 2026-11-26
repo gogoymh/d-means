@@ -47,7 +47,7 @@ def test_diagnose_reads_each_stage():
             texts.append(f"{names[m % 3]} item {m} number {i}")
             y.append(m % 3)
     x, y = np.array(x), np.array(y)
-    dm = DMeans(3, Perfect(), seed=0)
+    dm = DMeans(3, Perfect(), seed=0, consensus=False)
     dm.fit(x, texts)
     d = semantic.diagnose(dm, x, y)
     assert 0.9 <= d["purity"] <= 1.0

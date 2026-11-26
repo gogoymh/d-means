@@ -6,6 +6,9 @@ split one that is spread out, and they guess on points that sit between two cent
 d-means keeps the fast geometry and hands the two decisions geometry cannot make to a
 decision model (any `ask(requests) -> answers`, see dmeans.deciders), which reads the texts:
 
+When embedding clusters and an independent lexical view agree, a joint fit can preserve
+well-separated topics without irreversible micro-cluster merges. Otherwise:
+
 1. Over-cluster. e-means splits the data into `over * k` micro-clusters, which are much purer
    than k clusters.
 2. Merge by decision. For each micro-cluster and its nearest neighbours, the decider answers a Noul:
@@ -22,8 +25,12 @@ so the algorithm is tested offline with a scripted decider and replayed offline 
 """
 
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.decomposition import TruncatedSVD
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import adjusted_mutual_info_score
+from sklearn.preprocessing import normalize as unit_rows
 
 from . import _log, cards
 from .deciders import as_decider, normalize
@@ -69,10 +76,11 @@ class DMeans:
         seed: int = 1234,
         linkage: str = "average",
         fusion: str = "product",
+        consensus: bool = True,
     ):
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed
-        self.linkage, self.fusion = linkage, fusion
+        self.linkage, self.fusion, self.consensus = linkage, fusion, consensus
         self.decider = as_decider(decider)
         log.info("d-means decider: %s %s", type(self.decider).__name__, getattr(self.decider, "model", ""))
 
@@ -181,6 +189,33 @@ class DMeans:
         log.info("settled %d borderline points with Choice decisions, %d changed group", q, changed)
         return out
 
+    def _consensus(self, x: np.ndarray, texts: list[str]) -> np.ndarray | None:
+        """Use a joint embedding and lexical fit when the two views independently agree."""
+        # Give the lexical projection room to resolve at least two dimensions per group.
+        rank = min(64, len(x) - 1)
+        if self.k < 2 or rank < 2 * self.k:
+            return None
+        vectorizer = TfidfVectorizer(
+            stop_words="english", min_df=3, ngram_range=(1, 2), max_features=30_000, sublinear_tf=True,
+        )
+        try:
+            terms = vectorizer.fit_transform(texts)
+        except ValueError:
+            return None
+        rank = min(rank, terms.shape[1] - 1)
+        if rank < 2 * self.k:
+            return None
+        lexical = unit_rows(TruncatedSVD(rank, random_state=0).fit_transform(terms))
+        embedding = unit_rows(x)
+        geometric_labels = KMeans(self.k, n_init=8, random_state=self.seed).fit_predict(embedding)
+        lexical_labels = KMeans(self.k, n_init=5, random_state=self.seed).fit_predict(lexical)
+        # AMI adjusts for agreement expected by chance at this sample size and k.
+        if adjusted_mutual_info_score(geometric_labels, lexical_labels) < 1 / 3:
+            return None
+        joint = np.column_stack((embedding, 0.3 * lexical))
+        labels = KMeans(self.k, n_init=8, random_state=self.seed).fit_predict(joint)
+        return labels if np.unique(labels).size == self.k else None
+
     # --- fit -------------------------------------------------------------------------------
     def fit(self, x: np.ndarray, texts: list[str]) -> np.ndarray:
         """Cluster rows of `x` (embeddings of `texts`) into k groups; returns one label per row."""
@@ -188,6 +223,17 @@ class DMeans:
         if len(texts) != len(x):
             raise ValueError("x and texts must have the same length")
         self.pairs, self.p_same, self.asked, self.changed = [], np.zeros(0), np.zeros(0, dtype=np.int64), 0
+        self.partition_source = "decision"
+        if self.consensus:
+            labels = self._consensus(x, texts)
+            if labels is not None:
+                self.partition_source = "consensus"
+                self.engine = self.vocab = None
+                self.micro_centroids = np.empty((0, x.shape[1]), dtype=x.dtype)
+                self.micro_group = np.empty(0, dtype=np.int64)
+                self.merge_labels = self.labels = labels
+                self._record_report(len(x), 0.0)
+                return labels
         self.vocab = cards.Vocabulary(texts)
         mc, ml = self._micro(x)
         micro_cards = cards.build(self.vocab, texts, x, ml, len(mc))
@@ -197,14 +243,18 @@ class DMeans:
         self.merge_labels = labels.copy()
         labels = self._settle(x, texts, gd, labels)
         self.micro_centroids, self.micro_group, self.labels = mc, group, labels
+        self._record_report(len(x), self.engine.epochs_run)
+        return labels
+
+    def _record_report(self, n: int, epochs: float) -> None:
+        decisions = len(self.pairs) + len(self.asked)
         self.report = {
-            "micro_clusters": int(len(mc)),
+            "micro_clusters": len(self.micro_centroids),
             "pair_decisions": len(self.pairs),
             "point_decisions": int(len(self.asked)),
-            "decisions": len(self.pairs) + int(len(self.asked)),
-            "decisions_per_point": (len(self.pairs) + len(self.asked)) / len(x),
+            "decisions": decisions,
+            "decisions_per_point": decisions / n,
             "points_moved": int(self.changed),
-            "engine_epochs": self.engine.epochs_run,
+            "engine_epochs": epochs,
         }
         log.info("d-means done: %s", self.report)
-        return labels

@@ -144,7 +144,7 @@ def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:
             model = cls(k, nepochs=t, seed=seed)
             c, _ = model.fit(x)
             add(name, t, model.epochs_run, accuracy(y, nearest(x, c)[0]))
-        dm = DMeans(k, decider, about=prob["about"], nepochs=t, seed=seed)
+        dm = DMeans(k, decider, about=prob["about"], nepochs=t, seed=seed, consensus=False)
         lab = dm.fit(x, prob["texts"])
         add("d-means", t, dm.report["engine_epochs"], accuracy(y, lab))
         out["decisions_per_point"].append(dm.report["decisions_per_point"])

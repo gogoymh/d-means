@@ -160,6 +160,9 @@ from dmeans.deciders import Decisions, LLM
 
 DMeans(k, decider=Decisions("typesafe/jev-1.14"))             # TypeSafe Jev, OpenRouter Decisions API
 DMeans(k, decider=Decisions("cloudflare/clef"))               # Cloudflare Clef, open weights, same API
+DMeans(k, decider=Decisions("google/gemini-decision-1"))      # Google Gemini Decision 1
+DMeans(k, decider=Decisions("openai/gpt-6-luna-decisions"))    # OpenAI GPT-6 Luna Decisions
+DMeans(k, decider=Decisions("liquid/d1.2-ultra"))              # Liquid AI d1.2-ultra
 DMeans(k, decider=LLM("openai/gpt-5-mini"))                   # any chat model on OpenRouter
 DMeans(k, decider=LLM("qwen3:8b", base_url="http://localhost:11434/v1", api_key_env=None))  # local Ollama
 DMeans(k, decider=lambda state, question: ...)                # your own function
@@ -169,35 +172,26 @@ DMeans(k, decider=lambda state, question: ...)                # your own functio
 
 ### Decision models
 
-Both tables report clustering accuracy (%), averaged over seeds 0, 1, and 2. The best baseline is the highest mean among k-means, e-means, and o-means.
+Each column runs the same d-means strategy and changes only the decision model it can call. Accuracy (%) is averaged over seeds 0, 1, and 2. The best baseline is the highest mean among k-means, e-means, and o-means.
 
 <!-- bench:models -->
-#### Default strategy
+| Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 | Luna Decisions | d1.2-ultra |
+|:--|--:|--:|--:|--:|--:|--:|
+| TREC | 58.13 | **66.80** | 59.60 | 65.93 | 55.67 | 59.00 |
+| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 | 41.08 † | 40.57 |
+| AG News | 83.75 | **84.05** | **84.05** | **84.05** | **84.05** ‡ | **84.05** |
+| BBC News | 86.90 | **95.60** | **95.60** | **95.60** | **95.60** ‡ | **95.60** |
+| 20 Newsgroups | 56.85 | **57.17** | **57.17** ‡ | **57.17** | **57.17** ‡ | **57.17** |
+| Banking77 | 61.14 | 63.54 | 61.75 | 60.65 | 60.22 † | **66.73** |
 
-| Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 |
-|:--|--:|--:|--:|--:|
-| TREC | 58.13 | **66.80** | 59.60 | 65.93 |
-| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 |
-| AG News | 83.75 | **84.05** | **84.05** | **84.05** |
-| BBC News | 86.90 | **95.60** | **95.60** | **95.60** |
-| 20 Newsgroups | 56.85 | **57.17** | **57.17** | **57.17** |
-| Banking77 | 61.14 | **63.54** | 61.75 | 60.65 |
+† Refused requests received neutral probabilities: Luna Decisions on StackExchange (67), Luna Decisions on Banking77 (3).
 
-#### Decision model on every dataset
-
-| Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 |
-|:--|--:|--:|--:|--:|
-| TREC | 58.13 | **66.80** | 59.60 | 65.93 |
-| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 |
-| AG News | **83.75** | 70.01 | 72.47 | 72.52 |
-| BBC News | 86.90 | 70.17 | **96.73** | 94.80 |
-| 20 Newsgroups | **56.85** | 47.21 | 52.02 † | 49.87 |
-| Banking77 | 61.14 | **63.54** | 61.75 | 60.65 |
+‡ Refusals occurred in the model-only ablation: Luna Decisions on AG News (33), Luna Decisions on BBC News (3), Gemini Decision 1 on 20 Newsgroups (3), Luna Decisions on 20 Newsgroups (58). The displayed score used the consensus path.
 <!-- /bench:models -->
 
-The default strategy took the embedding–lexical consensus path on AG News, BBC News, and 20 Newsgroups in all three runs. These rows have the same scores for every model. The second table uses `consensus=False`.
+D-means used embedding–lexical consensus for AG News, BBC News, and 20 Newsgroups in every run. Scores on these datasets are shared because the strategy makes no model calls there.
 
-† Gemini declined three requests on 20 Newsgroups. The run used 0.5 for declined yes/no questions and equal probabilities for any declined choice question. [Per-seed ACC, NMI, and ARI](bench/results/decision-model-comparison.json).
+[Per-seed ACC, NMI, and ARI](bench/results/decision-model-comparison.json). The results file also includes the model-only ablation and recorded provider refusals.
 
 ## Benchmark
 

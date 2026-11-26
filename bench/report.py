@@ -147,35 +147,46 @@ def model_results() -> dict[str, dict]:
 
 
 def models_table(study: dict) -> str:
-    """Render complete model comparisons from the per-seed study results."""
-    ds = list(NAMES)
-    sections = []
-    baseline = {
-        d: max(mean(row["acc"] for row in study["baselines"][d][m]) for m in BASELINES)
-        for d in ds
-    }
-    for mode, title in (
-        ("adaptive", "Default strategy"),
-        ("decision_only", "Decision model on every dataset"),
-    ):
-        models = study["strategies"][mode]
-        rows = [
-            f"#### {title}",
+    """Compare decision models within the shipped d-means strategy."""
+    models = study["strategies"]["adaptive"]
+    abstentions = []
+    ablation_abstentions = []
+    rows = [
+        "| Dataset | Best baseline | " + " | ".join(MODELS[m] for m in models) + " |",
+        "|:--|--:|" + "--:|" * len(models),
+    ]
+    for d in NAMES:
+        baseline = max(mean(row["acc"] for row in study["baselines"][d][m]) for m in BASELINES)
+        scores = [mean(row["acc"] for row in datasets[d]["scores"]) for datasets in models.values()]
+        values = [baseline, *scores]
+        best = max(values)
+        cells = [f"**{v * 100:.2f}**" if v == best else f"{v * 100:.2f}" for v in values]
+        for i, (model, datasets) in enumerate(models.items(), start=1):
+            count = datasets[d]["policy_abstentions"]
+            if count:
+                cells[i] += " †"
+                abstentions.append(f"{MODELS[model]} on {_name(d)} ({count})")
+            else:
+                ablation = study["strategies"]["decision_only"].get(model, {}).get(d, {})
+                count = ablation.get("policy_abstentions", 0)
+                if count:
+                    cells[i] += " ‡"
+                    ablation_abstentions.append(f"{MODELS[model]} on {_name(d)} ({count})")
+        rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
+    if abstentions:
+        rows.extend([
             "",
-            "| Dataset | Best baseline | " + " | ".join(MODELS[m] for m in models) + " |",
-            "|:--|--:|" + "--:|" * len(models),
-        ]
-        for d in ds:
-            scores = [mean(row["acc"] for row in datasets[d]["scores"]) for datasets in models.values()]
-            values = [baseline[d], *scores]
-            best = max(values)
-            cells = [f"**{v * 100:.2f}**" if v == best else f"{v * 100:.2f}" for v in values]
-            for i, datasets in enumerate(models.values(), start=1):
-                if datasets[d]["policy_abstentions"]:
-                    cells[i] += " †"
-            rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
-        sections.append("\n".join(rows))
-    return "\n\n".join(sections)
+            "† Refused requests received neutral probabilities: "
+            + ", ".join(abstentions) + ".",
+        ])
+    if ablation_abstentions:
+        rows.extend([
+            "",
+            "‡ Refusals occurred in the model-only ablation: "
+            + ", ".join(ablation_abstentions) + ". The displayed score used the consensus path.",
+        ])
+    return "\n".join(rows)
+
 
 def ablation_table(res: dict) -> str:
     ds = list(res["datasets"])

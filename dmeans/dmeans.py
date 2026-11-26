@@ -6,8 +6,9 @@ split one that is spread out, and they guess on points that sit between two cent
 d-means keeps the fast geometry and hands the two decisions geometry cannot make to a
 decision model (any `ask(requests) -> answers`, see dmeans.deciders), which reads the texts:
 
-When embedding clusters and an independent lexical view agree, a joint fit can preserve
-well-separated topics without irreversible micro-cluster merges. Otherwise:
+The default path always uses the decider. With explicit consensus=True, a joint fit can
+instead preserve topics when embedding clusters and an independent lexical view agree.
+The decision path is:
 
 1. Over-cluster. e-means splits the data into `over * k` micro-clusters, which are much purer
    than k clusters.
@@ -76,7 +77,7 @@ class DMeans:
         seed: int = 1234,
         linkage: str = "average",
         fusion: str = "product",
-        consensus: bool = True,
+        consensus: bool = False,
     ):
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed

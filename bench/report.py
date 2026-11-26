@@ -148,9 +148,8 @@ def model_results() -> dict[str, dict]:
 
 def models_table(study: dict) -> str:
     """Compare decision models within the shipped d-means strategy."""
-    models = study["strategies"]["adaptive"]
+    models = study["strategies"]["decision_only"]
     abstentions = []
-    ablation_abstentions = []
     rows = [
         "| Dataset | Best baseline | " + " | ".join(MODELS[m] for m in models) + " |",
         "|:--|--:|" + "--:|" * len(models),
@@ -166,24 +165,12 @@ def models_table(study: dict) -> str:
             if count:
                 cells[i] += " †"
                 abstentions.append(f"{MODELS[model]} on {_name(d)} ({count})")
-            else:
-                ablation = study["strategies"]["decision_only"].get(model, {}).get(d, {})
-                count = ablation.get("policy_abstentions", 0)
-                if count:
-                    cells[i] += " ‡"
-                    ablation_abstentions.append(f"{MODELS[model]} on {_name(d)} ({count})")
         rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
     if abstentions:
         rows.extend([
             "",
             "† Refused requests received neutral probabilities: "
             + ", ".join(abstentions) + ".",
-        ])
-    if ablation_abstentions:
-        rows.extend([
-            "",
-            "‡ Refusals occurred in the model-only ablation: "
-            + ", ".join(ablation_abstentions) + ". The displayed score used the consensus path.",
         ])
     return "\n".join(rows)
 
@@ -320,9 +307,9 @@ def render(text: str) -> str:
     models = model_results()
     widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
     blocks = {"models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
-    consensus = RESULTS / "semantic-consensus-clef.json"
-    if consensus.exists():
-        blocks["consensus"] = semantic_table(json.loads(consensus.read_text()), consensus=True)
+    decision_results = RESULTS / "semantic-clef.json"
+    if decision_results.exists():
+        blocks["semantic"] = semantic_table(json.loads(decision_results.read_text()))
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

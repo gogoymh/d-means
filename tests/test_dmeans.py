@@ -92,7 +92,8 @@ def test_zero_budget_asks_no_point_questions(corpus):
 
 
 
-def test_consensus_resolves_agreeing_views_without_model_requests():
+@pytest.mark.parametrize("enable_consensus", [False, True])
+def test_consensus_requires_explicit_opt_in(enable_consensus):
     rng = np.random.default_rng(11)
     topics = [
         "river lake water stream ocean",
@@ -104,10 +105,16 @@ def test_consensus_resolves_agreeing_views_without_model_requests():
     texts = [topics[group] for group in truth]
     oracle = Oracle(texts, truth)
 
-    dm = DMeans(len(topics), oracle, seed=0)
+    options = {"consensus": True} if enable_consensus else {}
+    dm = DMeans(len(topics), oracle, seed=0, **options)
     labels = dm.fit(x, texts)
 
     assert accuracy(truth, labels) == 1.0
-    assert dm.partition_source == "consensus"
-    assert dm.report["decisions"] == 0
-    assert oracle.requests == []
+    if enable_consensus:
+        assert dm.partition_source == "consensus"
+        assert dm.report["decisions"] == 0
+        assert oracle.requests == []
+    else:
+        assert dm.partition_source == "decision"
+        assert dm.report["decisions"] > 0
+        assert oracle.requests

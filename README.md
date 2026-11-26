@@ -53,47 +53,6 @@ Lead is the accuracy difference from the best baseline, in percentage points.
 
 We developed the consensus strategy on these six datasets. The comparison uses the original baseline settings, including one initialization for k-means and eight for each embedding-based consensus fit. The results measure performance on the development benchmarks. [See the per-seed results](bench/results/semantic-consensus-clef.json).
 
-<details><summary>Previous results with Clef and no consensus check</summary>
-
-<!-- bench:semantic -->
-| Dataset | k&#8209;means | e&#8209;means | o&#8209;means | **d&#8209;means** |
-|:--|--:|--:|--:|--:|
-| TREC | 55.6 | 58.1 | 58.1 | **66.8** |
-| StackExchange | 37.6 | 33.7 | 34.8 | **42.4** |
-| AG News | **83.7** | 83.5 | 83.5 | 70.0 |
-| BBC News | 86.5 | **86.9** | **86.9** | 70.2 |
-| 20 Newsgroups | **56.9** | 49.3 | 52.4 | 47.2 |
-| Banking77 | 61.1 | 58.9 | 59.4 | **63.5** |
-
-Clustering accuracy (%), mean of seeds 0, 1, 2. d-means uses Clef. d-means beats the best baseline on ACC, NMI and ARI on 3 of 6 datasets. ACC leads on every seed for TREC, StackExchange and Banking77. It trails on AG News (ACC -13.7, NMI -1.5, ARI -8.7), BBC News (ACC -16.7, NMI -6.8, ARI -16.4) and 20 Newsgroups (ACC -9.6, NMI -1.0, ARI -3.1); [why](#where-d-means-loses). Every d-means number comes from Clef answers through OpenRouter (35,257 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
-
-<details><summary>Run details, NMI and ARI</summary>
-
-| Dataset | Texts | Clusters | Lead (pp) | Cost/run |
-|:--|--:|--:|--:|--:|
-| TREC | 500 | 6 | +8.7 | $0.014 |
-| StackExchange | 3,000 | 50 | +4.8 | $0.115 |
-| AG News | 7,600 | 4 | -13.7 | $0.221 |
-| BBC News | 1,000 | 5 | -16.7 | $0.046 |
-| 20 Newsgroups | 7,299 | 20 | -9.6 | $0.339 |
-| Banking77 | 3,080 | 77 | +2.4 | $0.123 |
-
-Lead is the accuracy difference from the best baseline, in percentage points.
-
-| Dataset | k-means NMI | e-means NMI | o-means NMI | d-means NMI | k-means ARI | e-means ARI | o-means ARI | d-means ARI |
-|:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 41.3 | 45.7 | 45.7 | **50.5** | 38.0 | 42.2 | 42.2 | **47.3** |
-| StackExchange | 48.1 | 46.0 | 46.8 | **52.1** | 23.1 | 18.6 | 20.7 | **28.9** |
-| AG News | 59.9 | **60.1** | **60.1** | 58.6 | **62.8** | 62.4 | 62.4 | 54.1 |
-| BBC News | 80.9 | **82.0** | **82.0** | 75.2 | 79.2 | **80.2** | **80.2** | 63.8 |
-| 20 Newsgroups | **56.9** | 55.4 | 56.1 | 55.9 | **40.1** | 38.4 | 39.4 | 37.0 |
-| Banking77 | 80.3 | 80.5 | 80.6 | **85.2** | 51.2 | 50.3 | 50.7 | **56.5** |
-
-</details>
-<!-- /bench:semantic -->
-
-</details>
-
 <p align="center">
   <img src="assets/clustering-comparison.png" alt="Four plots comparing the clustering accuracy of k-means, e-means, o-means and d-means as effective passes increase on TREC and StackExchange." width="960">
 </p>

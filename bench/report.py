@@ -317,7 +317,7 @@ def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
     models = model_results()
     widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
-    blocks = {"semantic": semantic_table(models[widest]), "models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
+    blocks = {"models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     consensus = RESULTS / "semantic-consensus-clef.json"
     if consensus.exists():
         blocks["consensus"] = semantic_table(json.loads(consensus.read_text()), consensus=True)

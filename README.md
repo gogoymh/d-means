@@ -12,46 +12,25 @@
 
 **D-means** groups texts by the topics or intents they share. K-means draws the groups; a decision model reads the texts that sit between them and decides where each one belongs.
 
-### Semantic clustering benchmark
+### Gain on each backbone
 
-<!-- bench:semantic -->
-| Dataset | K&#8209;means | E&#8209;means | O&#8209;means | **D&#8209;means** |
-|:--|--:|--:|--:|--:|
-| TREC | 56.1 | 59.3 | 55.0 | **62.0** |
-| StackExchange | 37.6 | 34.1 | 35.5 | **42.0** |
-| AG News | 83.8 | 83.8 | 81.9 | **88.1** |
-| BBC News | 95.5 | 87.5 | 77.0 | **95.6** |
-| 20 Newsgroups | 59.2 | 55.8 | 57.0 | **62.4** |
-| Banking77 | 62.8 | 61.7 | 59.8 | **67.9** |
+Start D-means from any baseline's partition, and it improves that partition by asking a decision model about 30% of the points.
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats the best baseline on ACC, NMI and ARI on 6 of 6 datasets. ACC leads on every seed for StackExchange, AG News, 20 Newsgroups and Banking77. Every D-means number comes from Clef answers through OpenRouter (36,801 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
+<!-- bench:backbones -->
+| Dataset | K-means → D-means | E-means → D-means | O-means → D-means |
+|:--|--:|--:|--:|
+| TREC | 56.1 → **62.0** (+5.9) | 59.3 → **62.8** (+3.5) | 55.0 → **56.2** (+1.2) |
+| StackExchange | 37.6 → **42.0** (+4.3) | 34.1 → **38.6** (+4.4) | 35.5 → **39.8** (+4.4) |
+| AG News | 83.8 → **88.1** (+4.3) | 83.8 → **87.7** (+3.8) | 81.9 → **87.4** (+5.4) |
+| BBC News | 95.5 → **95.6** (+0.1) | 87.5 → 86.7 (-0.8) | 77.0 → 76.7 (-0.3) |
+| 20 Newsgroups | 59.2 → **62.4** (+3.2) | 55.8 → **59.6** (+3.8) | 57.0 → **61.5** (+4.5) |
+| Banking77 | 62.8 → **67.9** (+5.1) | 61.7 → **66.5** (+4.8) | 59.8 → **64.0** (+4.2) |
+| Mean gain | **+3.8** | **+3.3** | **+3.2** |
 
-<details><summary>Run details, NMI and ARI</summary>
+ACC (%), mean of seeds 0, 1, 2, Clef, 30% of points asked. Each column starts D-means from that baseline's own partition, so the gain is measured against the partition it starts from. D-means improves its backbone in 16 of 18 cases.
+<!-- /bench:backbones -->
 
-| Dataset | Texts | Clusters | Lead (pp) | Cost/run |
-|:--|--:|--:|--:|--:|
-| TREC | 500 | 6 | +2.7 | $0.014 |
-| StackExchange | 3,000 | 50 | +4.3 | $0.107 |
-| AG News | 7,600 | 4 | +4.3 | $0.436 |
-| BBC News | 1,000 | 5 | +0.1 | $0.075 |
-| 20 Newsgroups | 7,299 | 20 | +3.2 | $0.567 |
-| Banking77 | 3,080 | 77 | +5.1 | $0.081 |
-
-Lead is the accuracy difference from the best baseline, in percentage points.
-
-| Dataset | K-means NMI | E-means NMI | O-means NMI | D-means NMI | K-means ARI | E-means ARI | O-means ARI | D-means ARI |
-|:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 43.5 | 45.2 | 43.1 | **50.2** | 43.6 | 41.1 | 39.4 | **49.5** |
-| StackExchange | 48.9 | 45.7 | 46.5 | **53.7** | 23.4 | 18.8 | 20.0 | **28.4** |
-| AG News | 60.0 | 60.5 | 58.9 | **68.5** | 62.9 | 62.9 | 60.5 | **71.9** |
-| BBC News | 86.6 | 82.3 | 75.3 | **87.3** | 89.3 | 81.4 | 70.0 | **89.5** |
-| 20 Newsgroups | 57.4 | 56.7 | 57.4 | **61.2** | 41.8 | 39.5 | 41.1 | **47.0** |
-| Banking77 | 81.0 | 81.0 | 80.1 | **84.4** | 53.1 | 52.0 | 49.5 | **59.7** |
-
-</details>
-<!-- /bench:semantic -->
-
-K-means takes the best of 10 initializations, the same start D-means uses, so every point of lead comes from the decision model. [See the per-seed results](bench/results/semantic-clef.json).
+On BBC News the E-means and O-means partitions trail K-means by 8 to 18 points, and settling boundary points does not repair them: D-means moves them by −0.8 and −0.3.
 
 <p align="center">
   <img src="assets/clustering-comparison.svg" alt="Four plots comparing the clustering accuracy of K-means, E-means, O-means and D-means as effective passes increase on TREC and StackExchange." width="960">
@@ -194,27 +173,50 @@ ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: 
 
 Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
 
-### Gain on each backbone
-
-D-means does not need K-means. Start it from any partition, and it settles that partition's boundary points with the same 30% budget.
-
-<!-- bench:backbones -->
-| Dataset | K-means → D-means | E-means → D-means | O-means → D-means |
-|:--|--:|--:|--:|
-| TREC | 56.1 → **62.0** (+5.9) | 59.3 → **62.8** (+3.5) | 55.0 → **56.2** (+1.2) |
-| StackExchange | 37.6 → **42.0** (+4.3) | 34.1 → **38.6** (+4.4) | 35.5 → **39.8** (+4.4) |
-| AG News | 83.8 → **88.1** (+4.3) | 83.8 → **87.7** (+3.8) | 81.9 → **87.4** (+5.4) |
-| BBC News | 95.5 → **95.6** (+0.1) | 87.5 → 86.7 (-0.8) | 77.0 → 76.7 (-0.3) |
-| 20 Newsgroups | 59.2 → **62.4** (+3.2) | 55.8 → **59.6** (+3.8) | 57.0 → **61.5** (+4.5) |
-| Banking77 | 62.8 → **67.9** (+5.1) | 61.7 → **66.5** (+4.8) | 59.8 → **64.0** (+4.2) |
-| Mean gain | **+3.8** | **+3.3** | **+3.2** |
-
-ACC (%), mean of seeds 0, 1, 2, Clef, 30% of points asked. Each column starts D-means from that baseline's own partition, so the gain is measured against the partition it starts from. D-means improves its backbone in 16 of 18 cases.
-<!-- /bench:backbones -->
-
-On BBC News the E-means and O-means partitions trail K-means by 8 to 18 points, and settling boundary points does not repair them: D-means moves them by −0.8 and −0.3.
-
 ## Benchmark
+
+### Against every baseline
+
+D-means on its default K-means backbone, against the best of K-means, E-means and O-means on each dataset.
+
+<!-- bench:semantic -->
+| Dataset | K&#8209;means | E&#8209;means | O&#8209;means | **D&#8209;means** |
+|:--|--:|--:|--:|--:|
+| TREC | 56.1 | 59.3 | 55.0 | **62.0** |
+| StackExchange | 37.6 | 34.1 | 35.5 | **42.0** |
+| AG News | 83.8 | 83.8 | 81.9 | **88.1** |
+| BBC News | 95.5 | 87.5 | 77.0 | **95.6** |
+| 20 Newsgroups | 59.2 | 55.8 | 57.0 | **62.4** |
+| Banking77 | 62.8 | 61.7 | 59.8 | **67.9** |
+
+Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats the best baseline on ACC, NMI and ARI on 6 of 6 datasets. ACC leads on every seed for StackExchange, AG News, 20 Newsgroups and Banking77. Every D-means number comes from Clef answers through OpenRouter (36,801 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
+
+<details><summary>Run details, NMI and ARI</summary>
+
+| Dataset | Texts | Clusters | Lead (pp) | Cost/run |
+|:--|--:|--:|--:|--:|
+| TREC | 500 | 6 | +2.7 | $0.014 |
+| StackExchange | 3,000 | 50 | +4.3 | $0.107 |
+| AG News | 7,600 | 4 | +4.3 | $0.436 |
+| BBC News | 1,000 | 5 | +0.1 | $0.075 |
+| 20 Newsgroups | 7,299 | 20 | +3.2 | $0.567 |
+| Banking77 | 3,080 | 77 | +5.1 | $0.081 |
+
+Lead is the accuracy difference from the best baseline, in percentage points.
+
+| Dataset | K-means NMI | E-means NMI | O-means NMI | D-means NMI | K-means ARI | E-means ARI | O-means ARI | D-means ARI |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| TREC | 43.5 | 45.2 | 43.1 | **50.2** | 43.6 | 41.1 | 39.4 | **49.5** |
+| StackExchange | 48.9 | 45.7 | 46.5 | **53.7** | 23.4 | 18.8 | 20.0 | **28.4** |
+| AG News | 60.0 | 60.5 | 58.9 | **68.5** | 62.9 | 62.9 | 60.5 | **71.9** |
+| BBC News | 86.6 | 82.3 | 75.3 | **87.3** | 89.3 | 81.4 | 70.0 | **89.5** |
+| 20 Newsgroups | 57.4 | 56.7 | 57.4 | **61.2** | 41.8 | 39.5 | 41.1 | **47.0** |
+| Banking77 | 81.0 | 81.0 | 80.1 | **84.4** | 53.1 | 52.0 | 49.5 | **59.7** |
+
+</details>
+<!-- /bench:semantic -->
+
+K-means takes the best of 10 initializations, the same start D-means uses, so every point of lead comes from the decision model. [See the per-seed results](bench/results/semantic-clef.json).
 
 ```bash
 uv run python -m bench.semantic --verify   # main table with Clef, offline replay

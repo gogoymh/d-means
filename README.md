@@ -10,7 +10,7 @@
   <a href="#decision-models">Decision models</a>
 </p>
 
-**D-means** groups texts by the topics or intents they share. K-means draws the groups; a decision model reads the texts that sit between them and decides where each one belongs.
+**D-means** groups texts by the topics or intents they share. Any clustering backbone, K-means by default, draws the groups; a decision model reads the texts that sit between them and decides where each one belongs.
 
 ### Gain on each backbone
 

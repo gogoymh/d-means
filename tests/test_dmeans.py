@@ -139,3 +139,25 @@ def test_consensus_requires_explicit_opt_in(enable_consensus):
         assert dm.partition_source == "decision"
         assert dm.report["decisions"] > 0
         assert oracle.requests
+
+
+def test_backbone_start_keeps_the_given_partition_without_a_budget(corpus):
+    x, texts, y = corpus
+    c, _ = EMeans(4, nepochs=5, seed=0).fit(x)
+    dm = DMeans(4, Oracle(texts, y), seed=0, start=c, budget=0.0)
+    lab = dm.fit(x, texts)
+    assert np.array_equal(lab, ((x[:, None, :] - c[None]) ** 2).sum(-1).argmin(1))
+    with pytest.raises(ValueError, match="k=4 rows"):
+        DMeans(4, Oracle(texts, y), start=c[:3])
+
+
+def test_random_selection_asks_as_many_points_elsewhere(corpus):
+    x, texts, y = corpus
+    by_margin = DMeans(4, Oracle(texts, y), seed=0)
+    by_margin.fit(x, texts)
+    at_random = DMeans(4, Oracle(texts, y), seed=0, select="random")
+    at_random.fit(x, texts)
+    assert len(at_random.asked) == len(by_margin.asked)
+    assert set(at_random.asked) != set(by_margin.asked)
+    with pytest.raises(ValueError, match="select"):
+        DMeans(4, Oracle(texts, y), select="all")

@@ -88,17 +88,22 @@ class DMeans:
         linkage: str = "average",
         fusion: str = "product",
         consensus: bool = False,
-        start: str = "kmeans",
+        start: "str | np.ndarray" = "kmeans",
         restarts: int = 10,
         refine: bool = False,
+        select: str = "margin",
     ):
-        if start not in ("kmeans", "merge"):
-            raise ValueError(f"start must be 'kmeans' or 'merge', not {start!r}")
+        if isinstance(start, str) and start not in ("kmeans", "merge"):
+            raise ValueError(f"start must be 'kmeans', 'merge' or a (k, d) array of centroids, not {start!r}")
+        if not isinstance(start, str) and np.shape(start)[0] != k:
+            raise ValueError(f"start centroids must have k={k} rows, got {np.shape(start)[0]}")
+        if select not in ("margin", "random"):
+            raise ValueError(f"select must be 'margin' or 'random', not {select!r}")
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed
         self.linkage, self.fusion, self.consensus = linkage, fusion, consensus
         self.start, self.restarts = start, restarts
-        self.refine = refine
+        self.refine, self.select = refine, select
         self.decider = as_decider(decider)
         log.info("d-means decider: %s %s", type(self.decider).__name__, getattr(self.decider, "model", ""))
 
@@ -176,7 +181,10 @@ class DMeans:
         srt = np.sort(gd, axis=1)
         margin = srt[:, 1] - srt[:, 0]
         tau = float(np.median(margin)) or 1e-6
-        ask = np.argsort(margin, kind="stable")[:q]
+        if self.select == "random":  # control: the same number of questions, on points drawn at random
+            ask = np.random.default_rng(self.seed + 11).permutation(n)[:q]
+        else:
+            ask = np.argsort(margin, kind="stable")[:q]
         group_cards = cards.build(self.vocab, texts, x, labels, self.k)
         rng = np.random.default_rng(self.seed + 7)
         m = min(self.candidates, self.k)
@@ -280,7 +288,10 @@ class DMeans:
                 self._record_report(len(x), 0.0)
                 return labels
         self.vocab = cards.Vocabulary(texts)
-        if self.start == "kmeans":
+        if not isinstance(self.start, str):  # a backbone's centroids, e.g. from E-means or O-means
+            mc, group, epochs = np.ascontiguousarray(self.start, dtype=np.float32), np.arange(self.k), 0.0
+            log.info("backbone start: %d given centroids", self.k)
+        elif self.start == "kmeans":
             km = KMeans(self.k, n_init=self.restarts, random_state=self.seed).fit(x)
             mc, group = km.cluster_centers_.astype(np.float32), np.arange(self.k)
             epochs = float(km.n_iter_)

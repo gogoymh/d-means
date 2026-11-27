@@ -198,6 +198,51 @@ def ablation_table(res: dict) -> str:
     return "\n".join(rows) + "\n\nACC (%), mean of the same seeds."
 
 
+def backbone_table(study: dict) -> str:
+    """D-means started from each baseline's own partition: ACC before and after, and the gain."""
+    ds = list(study["datasets"])
+    heads = ["K-means", "E-means", "O-means"]
+    rows = [
+        "| Dataset | " + " | ".join(f"{h} → D-means" for h in heads) + " |",
+        "|:--|" + "--:|" * len(heads),
+    ]
+    gains = {h: [] for h in heads}
+    for d in ds:
+        avg_runs = study["datasets"][d]["mean"]
+        cells = []
+        for h in heads:
+            b, dm = avg_runs[f"backbone {h.lower()}"]["acc"], avg_runs[f"d-means on {h.lower()}"]["acc"]
+            gains[h].append(dm - b)
+            after = f"**{_pct(dm)}**" if dm > b else _pct(dm)
+            cells.append(f"{_pct(b)} → {after} ({100 * (dm - b):+.1f})")
+        rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
+    avg = " | ".join(f"**{100 * mean(gains[h]):+.1f}**" for h in heads)
+    rows.append(f"| Mean gain | {avg} |")
+    up = sum(g > 0 for h in heads for g in gains[h])
+    return "\n".join(rows) + (
+        f"\n\nACC (%), mean of seeds {', '.join(map(str, study['seeds']))}, Clef, 30% of points asked. "
+        f"Each column starts D-means from that baseline's own partition, so the gain is measured against the partition it starts from. "
+        f"D-means improves its backbone in {up} of {len(heads) * len(ds)} cases."
+    )
+
+
+def budget_table(study: dict) -> str:
+    """How many points to ask about, and which: ACC per budget on the K-means backbone, and a random 30%."""
+    ds = list(study["datasets"])
+    first = study["datasets"][ds[0]]["mean"]
+    budgets = [m for m in first if m.startswith("budget ")]
+    rows = [
+        "| Points asked | " + " | ".join(_name(d) for d in ds) + " |",
+        "|:--|" + "--:|" * len(ds),
+    ]
+    for m in budgets + ["random 30%"]:
+        share = float(m.split()[1]) if m != "random 30%" else None
+        label = "0% (K-means)" if share == 0 else "**30% by margin (default)**" if share == 0.30 else "100% (every point)" if share == 1.0 else f"{100 * share:.0f}% by margin" if share is not None else "30% at random"
+        vals = [study["datasets"][d]["mean"][m]["acc"] for d in ds]
+        rows.append(f"| {label} | " + " | ".join(_pct(v) for v in vals) + " |")
+    return "\n".join(rows) + "\n\nACC (%), mean of the same seeds, Clef, K-means backbone. 100% asks the model about every point."
+
+
 def mse_table(res: dict) -> str:
     rows = ["| Problem | Epochs | E-means MSE vs Lloyd@25 | O-means MSE vs Lloyd@25 | O-means distances vs E-means | Lloyd@25 time | E-means time | O-means time |", "|:--|--:|--:|--:|--:|--:|--:|--:|"]
     for name, r in res.items():
@@ -281,6 +326,9 @@ def charts() -> dict[Path, str]:
 def render(text: str) -> str:
     main = json.loads(paths(MODEL)[1].read_text())
     blocks = {"semantic": semantic_table(main), "ablation": ablation_table(main), "models": models_table(current_results())}
+    if (RESULTS / "study-clef.json").exists():
+        study = json.loads((RESULTS / "study-clef.json").read_text())
+        blocks["backbones"], blocks["budget"] = backbone_table(study), budget_table(study)
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

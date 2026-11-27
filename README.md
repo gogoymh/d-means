@@ -51,7 +51,7 @@ Lead is the accuracy difference from the best baseline, in percentage points.
 </details>
 <!-- /bench:semantic -->
 
-K-means takes the best of 10 initializations, the same start D-means uses, so every point of lead comes from the decision model. These are development benchmarks: the strategy was chosen on these six datasets, not validated on untouched ones. [See the per-seed results](bench/results/semantic-clef.json).
+K-means takes the best of 10 initializations, the same start D-means uses, so every point of lead comes from the decision model. [See the per-seed results](bench/results/semantic-clef.json).
 
 <p align="center">
   <img src="assets/clustering-comparison.svg" alt="Four plots comparing the clustering accuracy of K-means, E-means, O-means and D-means as effective passes increase on TREC and StackExchange." width="960">
@@ -194,12 +194,33 @@ ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: 
 
 Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
 
+### Gain on each backbone
+
+D-means does not need K-means. Start it from any partition, and it settles that partition's boundary points with the same 30% budget.
+
+<!-- bench:backbones -->
+| Dataset | K-means → D-means | E-means → D-means | O-means → D-means |
+|:--|--:|--:|--:|
+| TREC | 56.1 → **62.0** (+5.9) | 59.3 → **62.8** (+3.5) | 55.0 → **56.2** (+1.2) |
+| StackExchange | 37.6 → **42.0** (+4.3) | 34.1 → **38.6** (+4.4) | 35.5 → **39.8** (+4.4) |
+| AG News | 83.8 → **88.1** (+4.3) | 83.8 → **87.7** (+3.8) | 81.9 → **87.4** (+5.4) |
+| BBC News | 95.5 → **95.6** (+0.1) | 87.5 → 86.7 (-0.8) | 77.0 → 76.7 (-0.3) |
+| 20 Newsgroups | 59.2 → **62.4** (+3.2) | 55.8 → **59.6** (+3.8) | 57.0 → **61.5** (+4.5) |
+| Banking77 | 62.8 → **67.9** (+5.1) | 61.7 → **66.5** (+4.8) | 59.8 → **64.0** (+4.2) |
+| Mean gain | **+3.8** | **+3.3** | **+3.2** |
+
+ACC (%), mean of seeds 0, 1, 2, Clef, 30% of points asked. Each column starts D-means from that baseline's own partition, so the gain is measured against the partition it starts from. D-means improves its backbone in 16 of 18 cases.
+<!-- /bench:backbones -->
+
+On BBC News the E-means and O-means partitions trail K-means by 8 to 18 points, and settling boundary points does not repair them: D-means moves them by −0.8 and −0.3.
+
 ## Benchmark
 
 ```bash
 uv run python -m bench.semantic --verify   # main table with Clef, offline replay
 uv run python -m bench.semantic --model typesafe/jev-1.14 --verify  # any other decision model
 uv run python -m bench.semantic --live     # ask Clef again (needs OpenRouter credits)
+uv run python -m bench.study --verify     # backbones, budget and random-selection control, offline
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
 uv run pytest                              # offline tests
@@ -207,7 +228,7 @@ uv run pytest                              # offline tests
 
 Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (K-means++, best of 10 initializations, Lloyd to convergence), and the authors' own E-means and O-means code at 5 epochs, all on the same embeddings and seeds. E-means is `faiss.contrib.e_means.NumpyEmeans` from the `faiss-cpu` wheel, run unchanged. O-means is the official [`contrib/o_means`](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means), vendored in [`bench/third_party/o_means`](bench/third_party/o_means): its training loop and schedule are untouched, and only its Triton GPU kernels are replaced by torch CPU code with the same arithmetic, checked in `tests/test_official.py`.
 
-**Ablations.** The same Clef runs as the main table, one change at a time. *Merge start* is the v1 strategy. These are development experiments, with no claim of evaluation on untouched datasets.
+**Ablations.** The same Clef runs as the main table, one change at a time. *Merge start* is the v1 strategy.
 
 <!-- bench:ablation -->
 | Variant | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | decisions / point |
@@ -221,6 +242,24 @@ Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by an
 
 ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
+
+**How many points to ask about, and which.** The same K-means backbone, asking about a growing share of points chosen by smallest margin, and a control that asks about 30% chosen at random.
+
+<!-- bench:budget -->
+| Points asked | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 |
+|:--|--:|--:|--:|--:|--:|--:|
+| 0% (K-means) | 56.1 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 |
+| 15% by margin | 59.0 | 40.1 | 87.2 | 96.1 | 61.2 | 66.0 |
+| **30% by margin (default)** | 62.0 | 42.0 | 88.1 | 95.6 | 62.4 | 67.9 |
+| 45% by margin | 62.9 | 43.6 | 88.3 | 95.4 | 62.9 | 69.0 |
+| 60% by margin | 64.3 | 44.9 | 88.3 | 95.4 | 63.1 | 69.7 |
+| 100% (every point) | 64.7 | 45.5 | 88.3 | 95.4 | 63.1 | 69.9 |
+| 30% at random | 57.6 | 40.2 | 85.3 | 95.4 | 60.5 | 64.7 |
+
+ACC (%), mean of the same seeds, Clef, K-means backbone. 100% asks the model about every point.
+<!-- /bench:budget -->
+
+On five datasets accuracy rises with every extra point asked and levels off past 60%. On BBC News, where K-means already reaches 95.5%, asking more does not help. On the other five, the default 30% buys 55% to 95% of the gain of asking about every point, at 30% of the calls. Choosing that 30% by margin beats choosing it at random on every dataset, by 0.2 to 4.4 points.
 
 **Why the merge path is no longer the default.** With Clef, the v1 merge path trailed on AG News, BBC News and 20 Newsgroups. Its micro-clusters were pure enough (95% on BBC News), but Clef answered "different topic" to most pairs from the same class, so average linkage merged on noise. Starting from K-means and spending the model's calls on the boundary wins on all six datasets. The merge path still scores higher on TREC (66.8 against 62.0), where answer type cuts across the embedding's topics; pass `start="merge"` when categories do not follow topical similarity.
 

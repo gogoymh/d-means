@@ -25,11 +25,12 @@ import time
 
 import numpy as np
 
-from dmeans import DMeans, EMeans, OMeans, _log, lloyd
+from dmeans import DMeans, _log, lloyd
 from dmeans.geometry import nearest
 from dmeans.deciders import CacheMiss, Decisions, request_key
 from dmeans.metrics import accuracy
 
+from . import official
 from .semantic import MODEL, RESULTS
 
 log = _log.get("bench.convergence")
@@ -140,10 +141,9 @@ def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:
     for t in whole:
         add("k-means", t, float(t), acc_at[int(t)])
     for t in epochs:
-        for name, cls in (("e-means", EMeans), ("o-means", OMeans)):
-            model = cls(k, nepochs=t, seed=seed)
-            c, _ = model.fit(x)
-            add(name, t, model.epochs_run, accuracy(y, nearest(x, c)[0]))
+        for name, train in (("e-means", official.emeans), ("o-means", official.omeans)):
+            c, passes = train(x, k, nepochs=t, seed=seed)
+            add(name, t, passes, accuracy(y, nearest(x, c)[0]))
         dm = DMeans(k, decider, about=prob["about"], nepochs=t, seed=seed, consensus=False, start="merge", budget=0.15, refine=False)  # recorded with the v1 strategy
         lab = dm.fit(x, prob["texts"])
         add("d-means", t, dm.report["engine_epochs"], accuracy(y, lab))

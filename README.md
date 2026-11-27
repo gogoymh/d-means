@@ -17,12 +17,12 @@
 <!-- bench:semantic -->
 | Dataset | K&#8209;means | E&#8209;means | O&#8209;means | **D&#8209;means** |
 |:--|--:|--:|--:|--:|
-| TREC | 56.1 | 58.1 | 58.1 | **62.0** |
-| StackExchange | 37.6 | 33.7 | 34.8 | **42.0** |
-| AG News | 83.8 | 83.5 | 83.5 | **88.1** |
-| BBC News | 95.5 | 86.9 | 86.9 | **95.6** |
-| 20 Newsgroups | 59.2 | 49.3 | 52.4 | **62.4** |
-| Banking77 | 62.8 | 58.9 | 59.4 | **67.9** |
+| TREC | 56.1 | 59.3 | 55.0 | **62.0** |
+| StackExchange | 37.6 | 34.1 | 35.5 | **42.0** |
+| AG News | 83.8 | 83.8 | 81.9 | **88.1** |
+| BBC News | 95.5 | 87.5 | 77.0 | **95.6** |
+| 20 Newsgroups | 59.2 | 55.8 | 57.0 | **62.4** |
+| Banking77 | 62.8 | 61.7 | 59.8 | **67.9** |
 
 Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats the best baseline on ACC, NMI and ARI on 6 of 6 datasets. ACC leads on every seed for StackExchange, AG News, 20 Newsgroups and Banking77. Every D-means number comes from Clef answers through OpenRouter (36,801 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
 
@@ -30,7 +30,7 @@ Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats
 
 | Dataset | Texts | Clusters | Lead (pp) | Cost/run |
 |:--|--:|--:|--:|--:|
-| TREC | 500 | 6 | +3.9 | $0.014 |
+| TREC | 500 | 6 | +2.7 | $0.014 |
 | StackExchange | 3,000 | 50 | +4.3 | $0.107 |
 | AG News | 7,600 | 4 | +4.3 | $0.436 |
 | BBC News | 1,000 | 5 | +0.1 | $0.075 |
@@ -41,12 +41,12 @@ Lead is the accuracy difference from the best baseline, in percentage points.
 
 | Dataset | K-means NMI | E-means NMI | O-means NMI | D-means NMI | K-means ARI | E-means ARI | O-means ARI | D-means ARI |
 |:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 43.5 | 45.7 | 45.7 | **50.2** | 43.6 | 42.2 | 42.2 | **49.5** |
-| StackExchange | 48.9 | 46.0 | 46.8 | **53.7** | 23.4 | 18.6 | 20.7 | **28.4** |
-| AG News | 60.0 | 60.1 | 60.1 | **68.5** | 62.9 | 62.4 | 62.4 | **71.9** |
-| BBC News | 86.6 | 82.0 | 82.0 | **87.3** | 89.3 | 80.2 | 80.2 | **89.5** |
-| 20 Newsgroups | 57.4 | 55.4 | 56.1 | **61.2** | 41.8 | 38.4 | 39.4 | **47.0** |
-| Banking77 | 81.0 | 80.5 | 80.6 | **84.4** | 53.1 | 50.3 | 50.7 | **59.7** |
+| TREC | 43.5 | 45.2 | 43.1 | **50.2** | 43.6 | 41.1 | 39.4 | **49.5** |
+| StackExchange | 48.9 | 45.7 | 46.5 | **53.7** | 23.4 | 18.8 | 20.0 | **28.4** |
+| AG News | 60.0 | 60.5 | 58.9 | **68.5** | 62.9 | 62.9 | 60.5 | **71.9** |
+| BBC News | 86.6 | 82.3 | 75.3 | **87.3** | 89.3 | 81.4 | 70.0 | **89.5** |
+| 20 Newsgroups | 57.4 | 56.7 | 57.4 | **61.2** | 41.8 | 39.5 | 41.1 | **47.0** |
+| Banking77 | 81.0 | 81.0 | 80.1 | **84.4** | 53.1 | 52.0 | 49.5 | **59.7** |
 
 </details>
 <!-- /bench:semantic -->
@@ -166,14 +166,16 @@ Each column runs the default D-means strategy and changes only the decision mode
 <!-- bench:models -->
 | Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 | Luna Decisions | d1.2-ultra |
 |:--|--:|--:|--:|--:|--:|--:|
-| TREC | 58.1 | **62.0** | 60.3 | 60.7 | 58.6 | 61.9 |
-| StackExchange | 37.6 | 42.0 | **42.7** | 42.0 | - | 42.5 |
-| AG News | 83.8 | **88.1** | - | - | - | - |
-| BBC News | 95.5 | **95.6** | - | - | - | - |
-| 20 Newsgroups | 59.2 | **62.4** | - | - | - | - |
-| Banking77 | 62.8 | **67.9** | - | - | - | - |
+| TREC | 59.3 | **62.0** | 60.3 | 60.7 | 58.6 | 61.9 |
+| StackExchange | 37.6 | 42.0 | **42.7** | 42.0 | 41.2 † | 42.5 |
+| AG News | 83.8 | **88.1** | 87.4 | 85.8 | 84.6 † | 87.8 |
+| BBC News | 95.5 | 95.6 | 96.5 | 94.3 | 93.1 † | **96.9** |
+| 20 Newsgroups | 59.2 | 62.4 | **64.1** † | 63.2 | 62.6 † | 63.9 |
+| Banking77 | 62.8 | 67.9 | 66.9 | 66.8 | 66.6 † | **67.9** |
 
-ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: Clef 6 of 6, Gemini Decision 1 2 of 2, Jev 1.14 2 of 2, Luna Decisions 1 of 1 and d1.2-ultra 2 of 2. A dash is a run not recorded yet: Gemini Decision 1, Jev 1.14, Luna Decisions and d1.2-ultra still need the remaining datasets.
+ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: Clef 6 of 6, Gemini Decision 1 6 of 6, Jev 1.14 5 of 6, Luna Decisions 4 of 6 and d1.2-ultra 6 of 6.
+
+† The provider refused some requests, which count as neutral answers (equal probabilities): Luna Decisions on StackExchange (148), Luna Decisions on AG News (148), Luna Decisions on BBC News (5), Gemini Decision 1 on 20 Newsgroups (5), Luna Decisions on 20 Newsgroups (43), Luna Decisions on Banking77 (9).
 <!-- /bench:models -->
 
 Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`, and `--current --verify` for Jev. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
@@ -190,14 +192,14 @@ uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about
 uv run pytest                              # offline tests
 ```
 
-Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (K-means++, best of 10 initializations, Lloyd to convergence), E-means and O-means at 5 epochs, all on the same embeddings and seeds.
+Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (K-means++, best of 10 initializations, Lloyd to convergence), and the authors' own E-means and O-means code at 5 epochs, all on the same embeddings and seeds. E-means is `faiss.contrib.e_means.NumpyEmeans` from the `faiss-cpu` wheel, run unchanged. O-means is the official [`contrib/o_means`](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means), vendored in [`bench/third_party/o_means`](bench/third_party/o_means): its training loop and schedule are untouched, and only its Triton GPU kernels are replaced by torch CPU code with the same arithmetic, checked in `tests/test_official.py`.
 
 **Ablations.** The same Clef runs as the main table, one change at a time. *Merge start* is the v1 strategy. These are development experiments, with no claim of evaluation on untouched datasets.
 
 <!-- bench:ablation -->
 | Variant | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | decisions / point |
 |:--|--:|--:|--:|--:|--:|--:|--:|
-| best baseline | 58.1 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 | 0 |
+| best baseline | 59.3 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 | 0 |
 | k-means start only (no decisions) | 56.1 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 | 0 |
 | **D-means (default)** | 62.0 | 42.0 | 88.1 | 95.6 | 62.4 | 67.9 | 0.30 |
 | point budget 15% | 59.0 | 40.1 | 87.2 | 96.1 | 61.2 | 66.0 | 0.15 |
@@ -224,25 +226,25 @@ ACC (%), mean of the same seeds.
 | Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 41.1% |
 |:--|--:|--:|--:|--:|
 | K-means | - | 38.3 | 41.1 | 16 |
-| E-means | 38.1 | 40.1 | 40.5 | 3.93 |
-| O-means | 38.1 | 40.1 | 40.5 | 3.93 |
+| E-means | 37.4 | 39.6 | 40.8 | never |
+| O-means | 38.3 | 41.2 | 41.1 | 1 |
 | **D-means** | **48.0** | **49.8** | **49.9** | **0.0213** |
 
-Synthetic topics, mean of 50 seeds, decisions from a simulated decider, wrong on 20% of answers. The best baseline ends at 41.1% (K-means, 16 epochs). D-means passes it at its first budget, 0.0213 epochs, 184x sooner than the fastest baseline gets there (E-means, 3.93 epochs).
+Synthetic topics, mean of 50 seeds, decisions from a simulated decider, wrong on 20% of answers. The best baseline ends at 41.1% (K-means, 16 epochs). D-means passes it at its first budget, 0.0213 epochs, 47x sooner than the fastest baseline gets there (O-means, 1 epochs).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-trec-dark.svg">
-  <img alt="Clustering accuracy vs. epochs: D-means reaches the best baseline's final accuracy after 0.512 epochs, not first" src="assets/convergence-trec-light.svg" width="100%">
+  <img alt="Clustering accuracy vs. epochs: D-means clears the best baseline's final accuracy after 3.84 epochs" src="assets/convergence-trec-light.svg" width="100%">
 </picture>
 
-| Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 55.6% |
+| Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 60.1% |
 |:--|--:|--:|--:|--:|
-| K-means | - | 51.3 | 55.6 | 16 |
-| E-means | 43.4 | **57.2** | 54.9 | **0.496** |
-| O-means | 43.4 | **57.2** | 54.9 | **0.496** |
-| **D-means** | **49.5** | 56.9 | **64.3** | 0.512 |
+| K-means | - | 51.3 | 55.6 | never |
+| E-means | 34.5 | 53.3 | 56.6 | never |
+| O-means | 33.3 | 54.3 | 60.1 | 16 |
+| **D-means** | **49.5** | **56.9** | **64.3** | **3.84** |
 
-TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 55.6% (K-means, 16 epochs). D-means reaches it at 0.512 epochs; E-means gets there first, at 0.496 epochs.
+TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 60.1% (O-means, 16 epochs). D-means passes it at 3.84 epochs, 4x sooner than the fastest baseline gets there (O-means, 16 epochs).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-stackexchange-dark.svg">
@@ -252,8 +254,8 @@ TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 55.6% 
 | Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 37.5% |
 |:--|--:|--:|--:|--:|
 | K-means | - | **31.9** | 37.5 | 16 |
-| E-means | 15.2 | 26.5 | 35.4 | never |
-| O-means | 15.1 | 27.6 | 36.6 | never |
+| E-means | 6.5 | 26.7 | 37.0 | never |
+| O-means | 12.1 | 27.7 | 34.2 | never |
 | **D-means** | **22.6** | 31.2 | **42.5** | **1.96** |
 
 StackExchange, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 37.5% (K-means, 16 epochs). D-means passes it at 1.96 epochs, 8x sooner than the fastest baseline gets there (K-means, 16 epochs).
@@ -261,7 +263,7 @@ StackExchange, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends 
 
 Geometry converges, but to the wrong partition, and more epochs do not fix it. On the synthetic topics D-means is past the best baseline after one mini-batch. On real texts the picture is mixed: on StackExchange (k=50) D-means passes the best baseline at 2 epochs while E-means and O-means never get there, but on TREC (k=6) E-means touches the target first, at half an epoch, and then falls back below it. D-means keeps climbing on both and ends 8.7 points (TREC) and 5.0 points (StackExchange) above the best baseline. `bench.convergence --problems trec,stackexchange --seeds 0,1,2 --verify` replays the real curves offline.
 
-**Engines.** The E-means and O-means reimplementations reproduce what their authors report: E-means passes Lloyd's 25-iteration error within a few epochs, and O-means reaches it with a fraction of the distance computations.
+**Engines.** D-means' own NumPy E-means and O-means (`dmeans.EMeans`, `dmeans.OMeans`, used inside D-means and on bare vectors, not as benchmark baselines) reproduce what their authors report: E-means passes Lloyd's 25-iteration error within a few epochs, and O-means reaches it with a fraction of the distance computations.
 
 <!-- bench:mse -->
 | Problem | Epochs | E-means MSE vs Lloyd@25 | O-means MSE vs Lloyd@25 | O-means distances vs E-means | Lloyd@25 time | E-means time | O-means time |
@@ -311,4 +313,4 @@ Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero, 
 
 ## License
 
-MIT. Dependencies are NumPy, SciPy and scikit-learn (BSD). E-means and O-means are reimplemented here from their public descriptions.
+MIT. Dependencies are NumPy, SciPy and scikit-learn (BSD). `dmeans.EMeans` and `dmeans.OMeans` are reimplemented from their public descriptions. The benchmark baselines use the official E-means and O-means code (faiss, MIT; dev dependencies `faiss-cpu` and `torch`).

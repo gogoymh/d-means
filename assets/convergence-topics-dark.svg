@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 484" width="800" height="484" role="img" aria-labelledby="t d">
-<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (K-means). Epochs needed to reach it: D-means 0.0213, K-means 16, E-means 3.93, O-means 3.93.</desc>
+<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (K-means). Epochs needed to reach it: D-means 0.0213, K-means 16, E-means never, O-means 1.</desc>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;fill:#9198a1;font-size:12px}.h{fill:#f0f6fc;font-size:17px;font-weight:600}.n{font-variant-numeric:tabular-nums}.k{fill:#f0f6fc;font-weight:600}</style>
 <text class="h" x="56" y="32">Clustering accuracy vs. epochs</text>
 <text x="56" y="54">Synthetic topics, n=3,000, k=6. Mean of 50 seeds. Decisions: simulated, wrong on 20% of answers, 0.18 per point.</text>
@@ -37,29 +37,29 @@
 <circle cx="660.8" cy="320.6" r="3.5" fill="#338ced" stroke="#0d1117" stroke-width="2"/>
 <circle cx="728.0" cy="317.4" r="3.5" fill="#338ced" stroke="#0d1117" stroke-width="2"/>
 </g>
-<g data-method="e-means"><path d="M86.2,345.9 L192.7,338.8 L259.9,335.4 L327.1,331.0 L390.2,327.8 L457.4,327.5 L524.6,321.5 L591.8,313.5 L654.7,321.0 L712.6,323.4" fill="none" stroke="#e76624" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="86.2" cy="345.9" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="192.7" cy="338.8" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="259.9" cy="335.4" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="327.1" cy="331.0" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="390.2" cy="327.8" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="457.4" cy="327.5" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="524.6" cy="321.5" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="591.8" cy="313.5" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="654.7" cy="321.0" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
-<circle cx="712.6" cy="323.4" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<g data-method="e-means"><path d="M123.5,351.8 L190.7,340.6 L257.6,325.4 L324.8,337.6 L392.0,331.7 L459.2,331.5 L526.4,324.7 L593.6,319.9 L660.8,321.3 L728.0,320.3" fill="none" stroke="#e76624" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="123.5" cy="351.8" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="190.7" cy="340.6" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="257.6" cy="325.4" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="324.8" cy="337.6" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="392.0" cy="331.7" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="459.2" cy="331.5" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="526.4" cy="324.7" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="593.6" cy="319.9" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="660.8" cy="321.3" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
+<circle cx="728.0" cy="320.3" r="3.5" fill="#e76624" stroke="#0d1117" stroke-width="2"/>
 </g>
-<g data-method="o-means"><path d="M86.2,345.9 L192.7,338.6 L259.9,335.2 L327.1,330.9 L390.2,327.5 L457.4,327.4 L524.6,321.5 L591.8,313.5 L654.7,321.0 L712.6,323.4" fill="none" stroke="#00a888" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="86.2" cy="345.9" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="192.7" cy="338.6" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="259.9" cy="335.2" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="327.1" cy="330.9" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="390.2" cy="327.5" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="457.4" cy="327.4" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="524.6" cy="321.5" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="591.8" cy="313.5" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="654.7" cy="321.0" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
-<circle cx="712.6" cy="323.4" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<g data-method="o-means"><path d="M123.5,343.4 L190.7,337.7 L257.6,335.0 L324.8,325.9 L392.0,324.8 L459.2,316.7 L526.4,322.5 L593.6,314.5 L660.8,320.2 L728.0,317.9" fill="none" stroke="#00a888" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="123.5" cy="343.4" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="190.7" cy="337.7" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="257.6" cy="335.0" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="324.8" cy="325.9" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="392.0" cy="324.8" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="459.2" cy="316.7" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="526.4" cy="322.5" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="593.6" cy="314.5" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="660.8" cy="320.2" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
+<circle cx="728.0" cy="317.9" r="3.5" fill="#00a888" stroke="#0d1117" stroke-width="2"/>
 </g>
 <g data-method="d-means"><path d="M86.2,254.7 L192.7,256.0 L259.9,255.6 L327.1,247.9 L390.2,243.7 L457.4,237.5 L524.6,263.8 L591.8,249.8 L654.7,254.2 L712.6,237.0" fill="none" stroke="#f0f6fc" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="86.2" cy="254.7" r="4.5" fill="#f0f6fc" stroke="#0d1117" stroke-width="2"/>

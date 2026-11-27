@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "faiss-cpu>=1.16", "torch>=2.4"]  # official E-means and O-means baselines in bench/
 
 [build-system]
 requires = ["hatchling"]

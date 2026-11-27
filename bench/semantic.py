@@ -22,12 +22,12 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import roc_auc_score
 from threadpoolctl import threadpool_limits
 
-from dmeans import DMeans, EMeans, OMeans, _log
+from dmeans import DMeans, EMeans, _log
 from dmeans.geometry import nearest
 from dmeans.deciders import CacheMiss, Decisions
 from dmeans.metrics import accuracy, scores
 
-from . import data, embed
+from . import data, embed, official
 
 log = _log.get("bench.semantic")
 RESULTS = Path(__file__).resolve().parent / "results"
@@ -121,8 +121,7 @@ def geometric_merge(x: np.ndarray, k: int, seed: int, over: int = 3) -> np.ndarr
 def run_baseline(method: str, x: np.ndarray, k: int, seed: int) -> np.ndarray:
     if method == "k-means":
         return KMeans(k, n_init=RESTARTS, random_state=seed).fit(x).labels_
-    model = {"e-means": EMeans, "o-means": OMeans}[method](k, nepochs=5, seed=seed)
-    c, _ = model.fit(x)
+    c, _ = {"e-means": official.emeans, "o-means": official.omeans}[method](x, k, nepochs=5, seed=seed)
     return nearest(x, c)[0]
 
 

@@ -13,102 +13,88 @@
   <a href="#decision-models">Decision models</a>
 </p>
 
-**D-means** groups texts by the topics or intents they share. A decision model reads representative texts to merge related groups and resolve ambiguous assignments.
+**D-means** groups texts by the topics or intents they share. K-means draws the groups; a decision model reads the texts that sit between them and decides where each one belongs.
 
 ### Semantic clustering benchmark
 
 <!-- bench:semantic -->
 | Dataset | K&#8209;means | E&#8209;means | O&#8209;means | **D&#8209;means** |
 |:--|--:|--:|--:|--:|
-| TREC | 55.6 | 58.1 | 58.1 | **66.8** |
-| StackExchange | 37.6 | 33.7 | 34.8 | **42.4** |
-| AG News | **83.7** | 83.5 | 83.5 | 70.0 |
-| BBC News | 86.5 | **86.9** | **86.9** | 70.2 |
-| 20 Newsgroups | **56.9** | 49.3 | 52.4 | 47.2 |
-| Banking77 | 61.1 | 58.9 | 59.4 | **63.5** |
+| TREC | 56.1 | 58.1 | 58.1 | **62.0** |
+| StackExchange | 37.6 | 33.7 | 34.8 | **42.0** |
+| AG News | 83.8 | 83.5 | 83.5 | **88.1** |
+| BBC News | 95.5 | 86.9 | 86.9 | **95.6** |
+| 20 Newsgroups | 59.2 | 49.3 | 52.4 | **62.4** |
+| Banking77 | 62.8 | 58.9 | 59.4 | **67.9** |
 
-Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats the best baseline on ACC, NMI and ARI on 3 of 6 datasets. ACC leads on every seed for TREC, StackExchange and Banking77. It trails on AG News (ACC -13.7, NMI -1.5, ARI -8.7), BBC News (ACC -16.7, NMI -6.8, ARI -16.4) and 20 Newsgroups (ACC -9.6, NMI -1.0, ARI -3.1); [why](#where-d-means-loses). Every D-means number comes from Clef answers through OpenRouter (35,257 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
+Clustering accuracy (%), mean of seeds 0, 1, 2. D-means uses Clef. D-means beats the best baseline on ACC, NMI and ARI on 6 of 6 datasets. ACC leads on every seed for StackExchange, AG News, 20 Newsgroups and Banking77. Every D-means number comes from Clef answers through OpenRouter (36,801 decisions, committed in [`bench/results/clef-answers.jsonl.gz`](bench/results/clef-answers.jsonl.gz)).
 
 <details><summary>Run details, NMI and ARI</summary>
 
 | Dataset | Texts | Clusters | Lead (pp) | Cost/run |
 |:--|--:|--:|--:|--:|
-| TREC | 500 | 6 | +8.7 | $0.014 |
-| StackExchange | 3,000 | 50 | +4.8 | $0.115 |
-| AG News | 7,600 | 4 | -13.7 | $0.221 |
-| BBC News | 1,000 | 5 | -16.7 | $0.046 |
-| 20 Newsgroups | 7,299 | 20 | -9.6 | $0.339 |
-| Banking77 | 3,080 | 77 | +2.4 | $0.123 |
+| TREC | 500 | 6 | +3.9 | $0.014 |
+| StackExchange | 3,000 | 50 | +4.3 | $0.107 |
+| AG News | 7,600 | 4 | +4.3 | $0.436 |
+| BBC News | 1,000 | 5 | +0.1 | $0.075 |
+| 20 Newsgroups | 7,299 | 20 | +3.2 | $0.567 |
+| Banking77 | 3,080 | 77 | +5.1 | $0.081 |
 
 Lead is the accuracy difference from the best baseline, in percentage points.
 
 | Dataset | K-means NMI | E-means NMI | O-means NMI | D-means NMI | K-means ARI | E-means ARI | O-means ARI | D-means ARI |
 |:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 41.3 | 45.7 | 45.7 | **50.5** | 38.0 | 42.2 | 42.2 | **47.3** |
-| StackExchange | 48.1 | 46.0 | 46.8 | **52.1** | 23.1 | 18.6 | 20.7 | **28.9** |
-| AG News | 59.9 | **60.1** | **60.1** | 58.6 | **62.8** | 62.4 | 62.4 | 54.1 |
-| BBC News | 80.9 | **82.0** | **82.0** | 75.2 | 79.2 | **80.2** | **80.2** | 63.8 |
-| 20 Newsgroups | **56.9** | 55.4 | 56.1 | 55.9 | **40.1** | 38.4 | 39.4 | 37.0 |
-| Banking77 | 80.3 | 80.5 | 80.6 | **85.2** | 51.2 | 50.3 | 50.7 | **56.5** |
+| TREC | 43.5 | 45.7 | 45.7 | **50.2** | 43.6 | 42.2 | 42.2 | **49.5** |
+| StackExchange | 48.9 | 46.0 | 46.8 | **53.7** | 23.4 | 18.6 | 20.7 | **28.4** |
+| AG News | 60.0 | 60.1 | 60.1 | **68.5** | 62.9 | 62.4 | 62.4 | **71.9** |
+| BBC News | 86.6 | 82.0 | 82.0 | **87.3** | 89.3 | 80.2 | 80.2 | **89.5** |
+| 20 Newsgroups | 57.4 | 55.4 | 56.1 | **61.2** | 41.8 | 38.4 | 39.4 | **47.0** |
+| Banking77 | 81.0 | 80.5 | 80.6 | **84.4** | 53.1 | 50.3 | 50.7 | **59.7** |
 
 </details>
 <!-- /bench:semantic -->
 
-These are development benchmarks, not an independent validation of a tuned strategy. Every D-means run uses Clef with `consensus=False`; K-means uses one initialization. [See the per-seed results](bench/results/semantic-clef.json).
+K-means takes the best of 10 initializations, the same start D-means uses, so every point of lead comes from the decision model. These are development benchmarks: the strategy was chosen on these six datasets, not validated on untouched ones. [See the per-seed results](bench/results/semantic-clef.json).
 
 <p align="center">
   <img src="assets/clustering-comparison.svg" alt="Four plots comparing the clustering accuracy of K-means, E-means, O-means and D-means as effective passes increase on TREC and StackExchange." width="960">
 </p>
 
-The TREC and StackExchange convergence plot uses Jev 1.14 with consensus disabled. Each marker is the mean of three runs, and pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
+The TREC and StackExchange convergence plot was recorded with Jev 1.14 and the v1 merge strategy (`start="merge"`). Each marker is the mean of three runs, and pass counts exclude Jev calls. See the [convergence analysis](#benchmark) for the replay commands and per-dataset curves.
 
 ## How it works
 
 D-means takes **texts, their embedding vectors, and a target number of groups `k`**. The `about` instruction tells the decision model what makes two texts belong together, such as the customer's banking issue.
 
-By default, D-means takes the three steps below and uses the decision model. The experimental `consensus=True` option can bypass the model when embedding-based and word-based groupings agree. That optional path is excluded from the default benchmark.
-
 <p align="center">
-  <img src="assets/how-it-works.svg" alt="Illustrative banking example: split 600 messages into nine small groups; judge whether nearby groups describe the same issue and merge into three groups; then reconsider the 90 most ambiguous messages. Two transfer-fee groups receive a high same-issue probability, while a transfer-delay group receives a low one. An ambiguous message is assigned to transfer fees after combining model and distance scores." width="1080">
+  <img src="assets/how-it-works.svg" alt="Illustrative banking example: K-means splits 600 messages into three groups, D-means flags the 180 messages closest to a boundary, and the decision model reads each one against the group cards. For 'Why was I charged to send money?' distance favours transfer delays, but model probability times distance weight picks transfer fees." width="1080">
 </p>
 
 ### Example: sort 600 banking messages into 3 groups
 
-Suppose the messages cover transfer fees, delayed transfers, and lost cards. Two messages can both mention a *transfer* but describe different issues. Two others can describe the same fee using different words. Distance alone can mix them up.
-
-This walkthrough uses the default decision path:
+Suppose the messages cover transfer fees, delayed transfers, and lost cards. Two messages can both mention a *transfer* but describe different issues. Distance alone mixes them up near the boundary, and that is where D-means asks.
 
 ```python
 from dmeans import DMeans
 from dmeans.deciders import Decisions
 
-model = DMeans(k=3, decider=Decisions("cloudflare/clef"),
-               about="customer's banking issue", consensus=False)
+model = DMeans(k=3, decider=Decisions("cloudflare/clef"), about="customer's banking issue")
 labels = model.fit(embeddings, texts)  # 600 vectors and their 600 messages
 ```
 
-The groups, probabilities, and scores below are illustrative, not benchmark outputs. The algorithm returns numeric labels; names such as "transfer fees" explain the example, and are not supplied as a predefined list of categories.
+The groups, probabilities, and scores below are illustrative, not benchmark outputs. The algorithm returns numeric labels; names such as "transfer fees" explain the example and are not supplied as categories.
 
-**1. Start with small groups.** E-means first makes `3 × k = 9` micro-clusters: small groups of nearby vectors. This gives the next step smaller pieces to merge. Each group gets a **card** containing distinctive words and up to four representative messages. Three of the nine cards might look like this:
+**1. Split by distance.** K-means, best of 10 initializations, splits the vectors into `k = 3` groups. Each group gets a **card**: its most distinctive words and four representative messages.
 
-| Card | Typical words | Example message |
+| Group | Typical words | Example message |
 |:--|:--|:--|
-| A | transfer, fee, charged | "Why was I charged a transfer fee?" |
-| B | sending, money, cost | "Does sending money cost extra?" |
-| C | transfer, pending, arrived | "My transfer still hasn't arrived." |
+| 1 | transfer, fee, charged | "Why was I charged a transfer fee?" |
+| 2 | transfer, pending, arrived | "My transfer still hasn't arrived." |
+| 3 | card, lost, stolen | "I lost my card yesterday." |
 
-**2. Ask which groups belong together.** For each small group and its six nearest neighbours, the model reads the two cards and answers: *Do these describe the same customer's banking issue?* This yes/no probability question is called a **Noul** in the API.
+**2. Find the ambiguous messages.** D-means ranks every message by the gap between its two nearest group centres and flags the closest 30%: **180 of these 600 messages**. The other 420 keep their K-means group.
 
-| Pair | Example probability of the same issue | Effect on merging |
-|:--|--:|:--|
-| A + B | 0.96 | Strong evidence to group the two fee clusters together |
-| A + C | 0.08 | Strong evidence to keep fees and delays apart |
-
-D-means uses all pair scores to merge the nine small groups into exactly three groups. It repeatedly joins the groups with the smallest average `1 − probability` between their members. The two rows above are evidence for that process, not independent yes/no merge rules.
-
-**3. Reconsider the ambiguous messages.** After merging, each message starts in its nearest group. D-means selects the 15% whose distances to their two closest groups are most similar: **90 of these 600 messages**. For each, it asks the model to choose among the nearest groups, showing their cards. This multiple-option question is a **Choice** in the API.
-
-For *"Why was I charged to send money?"*, suppose distance slightly favours transfer delays. D-means multiplies the model's probability by a distance-based weight:
+**3. Ask the model.** For each flagged message the model reads the nearest group cards and answers: *which group shares the customer's banking issue of this text?* This multiple-option question is a **Choice** in the API. D-means multiplies the model's probability by a distance weight. For *"Why was I charged to send money?"* distance slightly favours transfer delays:
 
 | Candidate group | Model probability | Distance weight | Product |
 |:--|--:|--:|--:|
@@ -116,17 +102,17 @@ For *"Why was I charged to send money?"*, suppose distance slightly favours tran
 | Transfer delays | 0.10 | 1.00 | 0.1000 |
 | Lost cards | 0.05 | 0.05 | 0.0025 |
 
-The largest product wins, so this message moves to **transfer fees**. The other 510 messages keep their assignments from the merge step. Both the model's reading and the vector distances influence the final choice.
+The largest product wins, so the message moves to **transfer fees**. Both the model's reading and the vector distances shape the final choice.
 
 <details><summary>Exact defaults and implementation details</summary>
 
-- **Optional consensus check (`consensus=True`):** compare separate K-means partitions of unit-normalized embeddings and a low-rank TF-IDF representation using adjusted mutual information (AMI). A score of at least `1/3` triggers a fresh K-means fit on `[embedding, 0.3 × lexical]`. The check is skipped if there are too few usable lexical dimensions. `about` is used only on the decision path.
-- **Small groups:** `over=3`; the initial count is `min(3k, max(k, n // 4))`, with empty groups dropped. Cards use class-based TF-IDF keywords and up to four texts nearest the group's mean vector.
-- **Pair scoring:** `neighbors=6`, capped at the number of other micro-clusters, with duplicate pairs asked once. Unasked pairs get probabilities estimated from centroid cosine similarity, calibrated against the model's answers by isotonic regression. Average-linkage clustering on `1 − p` produces `k` groups.
-- **Point selection:** `budget=0.15`; ask about `round(0.15 × n)` points with the smallest gap between their two nearest group distances. A group's distance is the minimum squared distance to one of its micro-cluster centroids.
-- **Final choice:** `candidates=5`, capped at `k`. For each candidate, the distance weight is `exp(−(distance − closest_distance) / tau)`, where `tau` is the median gap across the corpus (or `1e-6` if zero). Multiply this by the model probability (with `1e-6` smoothing) and take the largest score. The example omits smoothing in the displayed arithmetic.
+- **Start (`start="kmeans"`):** scikit-learn `KMeans(k, n_init=restarts)`, `restarts=10`, seeded by `seed`. Cards use class-based TF-IDF keywords and up to four texts nearest the group's mean vector.
+- **Point selection:** `budget=0.30`; ask about `round(0.30 × n)` points with the smallest gap between their two nearest centroid distances.
+- **Final choice:** `candidates=5`, capped at `k`, in a shuffled order. For each candidate, the distance weight is `exp(−(distance − closest_distance) / tau)`, where `tau` is the median gap across the corpus (or `1e-6` if zero). Multiply this by the model probability (with `1e-6` smoothing) and take the largest score.
+- **v1 merge path (`start="merge"`):** over-cluster into `3k` E-means micro-clusters, ask a same-topic **Noul** for each micro-cluster and its six nearest neighbours, merge to `k` by average linkage on `1 − p`, then settle as above. It can repair structure that geometry gets wrong, as the synthetic chart below shows, but real decision models answer these pairwise questions too strictly to merge well on news topics. It stays available, and the recorded Jev, convergence and model-comparison results replay with it.
+- **Optional consensus check (`consensus=True`):** compare K-means partitions of the embeddings and a low-rank TF-IDF view by adjusted mutual information; at `1/3` or more, return a joint fit with zero model calls. Excluded from the benchmark.
 
-`model.partition_source` shows `"decision"` for the default path. `model.report` records pair decisions, point decisions, and points moved. The optional consensus path is a separate ablation and can use zero model calls.
+`model.report` records point decisions and points moved; `model.merge_labels` holds the partition before the model spoke.
 
 </details>
 
@@ -178,7 +164,7 @@ DMeans(k, decider=lambda state, question: ...)                # your own functio
 
 ### Decision models
 
-Each column runs the same D-means strategy and changes only the decision model it can call. Accuracy (%) is averaged over seeds 0, 1, and 2. The best baseline is the highest mean among K-means, E-means, and O-means.
+Each column runs the same D-means strategy and changes only the decision model it can call. This study was recorded with the v1 merge strategy (`start="merge"`) against single-initialization K-means, before the current default. Accuracy (%) is averaged over seeds 0, 1, and 2. The best baseline is the highest mean among K-means, E-means, and O-means.
 
 <!-- bench:models -->
 | Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 | Luna Decisions | d1.2-ultra |
@@ -200,7 +186,7 @@ Every displayed D-means score uses `consensus=False`. All six datasets use the s
 ## Benchmark
 
 ```bash
-uv run python -m bench.semantic --model cloudflare/clef --no-ablations --verify  # current default strategy
+uv run python -m bench.semantic --model cloudflare/clef --verify  # current default strategy, offline
 uv run python -m bench.semantic --verify   # offline replay of the legacy Jev results
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
@@ -208,44 +194,30 @@ uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about
 uv run pytest                              # offline tests
 ```
 
-Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (K-means++, Lloyd to convergence), E-means and O-means at 5 epochs, all on the same embeddings and seeds.
+Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by answer type and [StackExchange](https://huggingface.co/datasets/mteb/stackexchange-clustering) titles by site (3,000 from the first MTEB validation split). [AG News](https://github.com/mhjabreel/CharCnn_Keras/tree/master/data/ag_news_csv) headlines by section, [BBC News](https://huggingface.co/datasets/SetFit/bbc-news) articles by topic, [20 Newsgroups](https://huggingface.co/datasets/SetFit/20_newsgroups) posts by group and [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets) customer requests by intent were also evaluated with Clef. Test splits, texts cut at 1,000 characters. Embeddings: `sentence-transformers/all-mpnet-base-v2`. Baselines: scikit-learn `KMeans` (K-means++, best of 10 initializations, Lloyd to convergence), E-means and O-means at 5 epochs, all on the same embeddings and seeds.
 
-**Ablations.** These Jev 1.14 runs on TREC and StackExchange use `consensus=False`. The main table above uses Clef. These are development experiments, with no claim of evaluation on untouched datasets.
+**Ablations.** The same Clef runs as the main table, one change at a time. *Merge start* is the v1 strategy. These are development experiments, with no claim of evaluation on untouched datasets.
 
 <!-- bench:ablation -->
-| Variant | TREC | StackExchange | decisions / point |
-|:--|--:|--:|--:|
-| best baseline | 58.1 | 37.6 | 0 |
-| geometric merge (no decisions) | 59.5 | 35.9 | 0 |
-| **D-means (default)** | 65.9 | 42.3 | 0.30 to 0.41 |
-| merge only (no point decisions) | 62.3 | 38.9 | 0.15 to 0.26 |
-| point budget 5% | 63.9 | 40.0 | 0.20 to 0.31 |
-| point budget 10% | 64.9 | 41.2 | 0.25 to 0.36 |
-| decision only (no geometric prior) | 66.0 | 42.4 | 0.30 to 0.41 |
-| 10 merge neighbours | 65.3 | 42.5 | 0.38 to 0.59 |
-| spectral merge | 61.7 | 41.5 | 0.30 to 0.41 |
+| Variant | TREC | StackExchange | AG News | BBC News | 20 Newsgroups | Banking77 | decisions / point |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| best baseline | 58.1 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 | 0 |
+| k-means start only (no decisions) | 56.1 | 37.6 | 83.8 | 95.5 | 59.2 | 62.8 | 0 |
+| **D-means (default)** | 62.0 | 42.0 | 88.1 | 95.6 | 62.4 | 67.9 | 0.30 |
+| point budget 15% | 59.0 | 40.1 | 87.2 | 96.1 | 61.2 | 66.0 | 0.15 |
+| decision only (no geometric prior) | 62.1 | 42.1 | 88.4 | 95.4 | 62.1 | 67.9 | 0.30 |
+| merge start (v1 strategy) | 66.8 | 42.4 | 70.0 | 70.2 | 47.2 | 63.5 | 0.16 to 0.46 |
 
 ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
 
 <!-- bench:diagnose -->
-### Where D-means loses
 
-| Dataset | best baseline | micro-cluster purity | geometric merge | Clef merge | after settle | Noul AUC | settle moves right / wrong |
-|:--|--:|--:|--:|--:|--:|--:|--:|
-| TREC | 58.1 | 69.1 | 59.5 | 63.5 | 66.8 | 0.88 | 22 / 5 |
-| StackExchange | 37.6 | 48.3 | 35.9 | 39.2 | 42.4 | 0.91 | 107 / 13 |
-| AG News | 83.7 | 82.8 | 70.5 | 67.3 | 70.0 | 0.88 | 259 / 67 |
-| BBC News | 86.9 | 94.9 | 86.8 | 69.2 | 70.2 | 0.87 | 20 / 10 |
-| 20 Newsgroups | 56.9 | 62.2 | 47.3 | 45.3 | 47.2 | 0.81 | 195 / 63 |
-| Banking77 | 61.1 | 83.5 | 55.2 | 60.9 | 63.5 | 0.88 | 88 / 7 |
-
-ACC (%) after each stage of a default run with Clef, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. *Noul AUC* ranks Clef's p(same) on the asked pairs against "same majority class" (0.5 is chance). *Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run.
 <!-- /bench:diagnose -->
 
-The decision path improves ACC on TREC, StackExchange and Banking77 here, but loses on AG News, BBC News and 20 Newsgroups. In particular, accurate pairwise judgments do not guarantee that merging yields better final clusters.
+**Why the merge path is no longer the default.** With Clef, the v1 merge path trailed on AG News, BBC News and 20 Newsgroups. Its micro-clusters were pure enough (95% on BBC News), but Clef answered "different topic" to most pairs from the same class, so average linkage merged on noise. Starting from K-means and spending the model's calls on the boundary wins on all six datasets. The merge path still scores higher on TREC (66.8 against 62.0), where answer type cuts across the embedding's topics; pass `start="merge"` when categories do not follow topical similarity.
 
-**Convergence with consensus disabled.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,298 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where O-means draws over E-means, it scans every cell at that k.
+**Convergence of the v1 merge path.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,298 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where O-means draws over E-means, it scans every cell at that k.
 
 <!-- bench:convergence -->
 <picture>
@@ -314,7 +286,8 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 
 - D-means takes one input the baselines cannot: `about`, a few words that name the grouping ("news topic", "customer request"). Distance has no way to know you mean answer type rather than subject. No label names go in.
 - It needs something the decision model can read for each point. On bare vectors use `EMeans` or `OMeans`.
-- It optimizes agreement with human categories, not squared error. Its geometric engine is E-means; model calls and merging add cost, so engine speed does not establish end-to-end speed.
+- It optimizes agreement with human categories, not squared error. By default it adds model calls for 30% of the points on top of K-means, so end-to-end cost is the model's, not the engine's.
+- The default path keeps K-means' structure and fixes its boundaries. If geometry splits one category across distant modes, only the v1 merge path (`start="merge"`) can rejoin it.
 - Jev is measured on two datasets so far, Clef on all six. Jev's run on the other four (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new decisions, an estimated $1 to $2.
 - Replay rebuilds the exact requests, so it needs the embeddings in `.cache/emb`. A fresh clone re-embeds through OpenRouter on the first run.
 

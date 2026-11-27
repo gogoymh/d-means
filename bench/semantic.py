@@ -66,7 +66,20 @@ def paths(model: str = MODEL) -> tuple[Path, Path]:
 
 ANSWERS, OUT = paths()
 
+RESTARTS = 10  # K-means baseline initializations: the same start the default d-means uses
+
+# The legacy Jev and consensus results were recorded with the v1 merge strategy; replay them with it.
+LEGACY = {"start": "merge", "budget": 0.15}
+
 ABLATIONS = {
+    "d-means": {},
+    "k-means start only (no decisions)": {"budget": 0.0},
+    "point budget 15%": {"budget": 0.15},
+    "decision only (no geometric prior)": {"fusion": "decision"},
+    "merge start (v1 strategy)": {"start": "merge", "budget": 0.15},
+}
+
+LEGACY_ABLATIONS = {
     "d-means": {},
     "merge only (no point decisions)": {"budget": 0.0},
     "point budget 5%": {"budget": 0.05},
@@ -88,7 +101,7 @@ def has_ablations(out: Path) -> bool:
     if not out.exists():
         return True
     d = next(iter(json.loads(out.read_text())["datasets"].values()), {})
-    return "merge only (no point decisions)" in d.get("runs", {})
+    return bool({"merge only (no point decisions)", "k-means start only (no decisions)"} & set(d.get("runs", {})))
 
 
 def geometric_merge(x: np.ndarray, k: int, seed: int, over: int = 3) -> np.ndarray:
@@ -102,7 +115,7 @@ def geometric_merge(x: np.ndarray, k: int, seed: int, over: int = 3) -> np.ndarr
 
 def run_baseline(method: str, x: np.ndarray, k: int, seed: int) -> np.ndarray:
     if method == "k-means":
-        return KMeans(k, n_init=1, random_state=seed).fit(x).labels_
+        return KMeans(k, n_init=RESTARTS, random_state=seed).fit(x).labels_
     model = {"e-means": EMeans, "o-means": OMeans}[method](k, nepochs=5, seed=seed)
     c, _ = model.fit(x)
     return nearest(x, c)[0]
@@ -138,11 +151,13 @@ def diagnose(dm: DMeans, x: np.ndarray, y: np.ndarray) -> dict:
     return out
 
 
-def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool = True, consensus: bool = False, refine: bool = False) -> dict:
+def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool = True, consensus: bool = False, legacy: bool = False, refine: bool = False) -> dict:
     out = {
         "jev_model": jev.model,
         "embedder": embed.MODEL,
         "seeds": seeds,
+        "strategy": "merge" if legacy else "kmeans",
+        "kmeans_restarts": RESTARTS,
         "usd_per_decision": dict(USD_PER_DECISION) if jev.model == MODEL else {},
         "datasets": {},
     }
@@ -160,10 +175,12 @@ def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool =
             if refine:
                 lab = KMeans(ds.k, n_init=8, random_state=seed).fit_predict(x)
                 res.setdefault("k-means (8 starts)", []).append(scores(y, lab))
-            if ablations:
+            if ablations and legacy:
                 lab = geometric_merge(x, ds.k, seed)
                 res.setdefault("geometric merge (no decisions)", []).append(scores(y, lab))
-            for label, kw in (ABLATIONS if ablations else {"d-means": {}}).items():
+            variants = (LEGACY_ABLATIONS if legacy else ABLATIONS) if ablations else {"d-means": {}}
+            for label, kw in variants.items():
+                kw = {**(LEGACY if legacy else {}), **kw}
                 dm = DMeans(ds.k, jev, about=ds.about, seed=seed, consensus=consensus, refine=refine, **kw)
                 t0 = time.perf_counter()
                 lab = dm.fit(x, ds.texts)
@@ -174,7 +191,7 @@ def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool =
                         row["refinement"] = dm.refinement
                     if consensus:
                         row["consensus_runs"] = int(dm.partition_source == "consensus")
-                    if dm.partition_source == "decision":
+                    if dm.partition_source == "decision" and dm.start == "merge":
                         row.update(diagnose(dm, x, y))
                 res.setdefault(label, []).append(row)
             log.info("%s seed %d done", name, seed)
@@ -261,11 +278,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         names = a.datasets.split(",") if a.datasets else committed(out)
         seeds = [int(s) for s in a.seeds.split(",")]
+        # Jev and consensus results were recorded with the v1 merge strategy.
+        legacy = a.consensus or a.model == MODEL
         if a.consensus or a.refined:
             with threadpool_limits(4):
-                result = run(names, seeds, jev, ablations=False, consensus=a.consensus, refine=a.refined)
+                result = run(names, seeds, jev, ablations=False, consensus=a.consensus, legacy=a.consensus, refine=a.refined)
         else:
-            result = run(names, seeds, jev, ablations=not a.no_ablations and has_ablations(out))
+            result = run(names, seeds, jev, ablations=not a.no_ablations and has_ablations(out), legacy=legacy)
     except CacheMiss as e:
         log.error("%s answer %s is not in %s; run with --live to ask it", a.model, e, answers)
         return 2

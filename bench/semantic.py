@@ -132,13 +132,13 @@ def diagnose(dm: DMeans, x: np.ndarray, y: np.ndarray) -> dict:
             out["noul_auc"] = float(roc_auc_score(same, dm.p_same))
     if len(dm.asked):
         gmajor = np.array([np.bincount(y[dm.merge_labels == g]).argmax() if (dm.merge_labels == g).any() else -1 for g in range(dm.k)])
-        before, after, truth = gmajor[dm.merge_labels[dm.asked]], gmajor[dm.labels[dm.asked]], y[dm.asked]
+        before, after, truth = gmajor[dm.merge_labels[dm.asked]], gmajor[dm.decision_labels[dm.asked]], y[dm.asked]
         out["moved_right"] = int(((before != truth) & (after == truth)).sum())
         out["moved_wrong"] = int(((before == truth) & (after != truth)).sum())
     return out
 
 
-def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool = True, consensus: bool = False) -> dict:
+def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool = True, consensus: bool = False, refine: bool = False) -> dict:
     out = {
         "jev_model": jev.model,
         "embedder": embed.MODEL,
@@ -157,16 +157,21 @@ def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool =
                 t0 = time.perf_counter()
                 lab = run_baseline(m, x, ds.k, seed)
                 res.setdefault(m, []).append({**scores(y, lab), "seconds": time.perf_counter() - t0})
+            if refine:
+                lab = KMeans(ds.k, n_init=8, random_state=seed).fit_predict(x)
+                res.setdefault("k-means (8 starts)", []).append(scores(y, lab))
             if ablations:
                 lab = geometric_merge(x, ds.k, seed)
                 res.setdefault("geometric merge (no decisions)", []).append(scores(y, lab))
             for label, kw in (ABLATIONS if ablations else {"d-means": {}}).items():
-                dm = DMeans(ds.k, jev, about=ds.about, seed=seed, consensus=consensus, **kw)
+                dm = DMeans(ds.k, jev, about=ds.about, seed=seed, consensus=consensus, refine=refine, **kw)
                 t0 = time.perf_counter()
                 lab = dm.fit(x, ds.texts)
                 row = {**scores(y, lab), "decisions": dm.report["decisions"], "decisions_per_point": dm.report["decisions_per_point"]}
                 if label == "d-means":
                     row["seconds_without_jev"] = time.perf_counter() - t0
+                    if refine:
+                        row["refinement"] = dm.refinement
                     if consensus:
                         row["consensus_runs"] = int(dm.partition_source == "consensus")
                     if dm.partition_source == "decision":
@@ -240,7 +245,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--live", action="store_true", help="ask the model for answers missing from the cache")
     ap.add_argument("--write", action="store_true", help="save the results file and prune the legacy answer cache")
     ap.add_argument("--verify", action="store_true", help="fail unless results match the committed results file")
-    ap.add_argument("--consensus", action="store_true", help="benchmark the adaptive embedding and lexical consensus strategy")
+    strategy = ap.add_mutually_exclusive_group()
+    strategy.add_argument("--refined", action="store_true", help="evaluate the current decision-guided refinement")
+    strategy.add_argument("--consensus", action="store_true", help="benchmark the adaptive embedding and lexical consensus strategy")
     ap.add_argument("--no-ablations", action="store_true")
     a = ap.parse_args(argv)
     _log.setup()
@@ -248,13 +255,15 @@ def main(argv: list[str] | None = None) -> int:
     out = legacy_out
     if a.consensus:
         out = RESULTS / f"semantic-consensus-{slug(a.model)}.json"
+    if a.refined:
+        out = RESULTS / f"semantic-refined-{slug(a.model)}.json"
     jev = Decisions(a.model, answers, offline=not a.live)
     try:
         names = a.datasets.split(",") if a.datasets else committed(out)
         seeds = [int(s) for s in a.seeds.split(",")]
-        if a.consensus:
+        if a.consensus or a.refined:
             with threadpool_limits(4):
-                result = run(names, seeds, jev, ablations=False, consensus=True)
+                result = run(names, seeds, jev, ablations=False, consensus=a.consensus, refine=a.refined)
         else:
             result = run(names, seeds, jev, ablations=not a.no_ablations and has_ablations(out))
     except CacheMiss as e:
@@ -276,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.write:
         RESULTS.mkdir(exist_ok=True)
         out.write_text(json.dumps(result, indent=1) + "\n")
-        if not a.consensus:
+        if not (a.consensus or a.refined):
             jev.save(keep=jev.used)
         log.info("wrote %s", out)
     if a.verify:

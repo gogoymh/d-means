@@ -31,6 +31,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import adjusted_mutual_info_score
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize as unit_rows
 
 from . import _log, cards
@@ -78,10 +79,12 @@ class DMeans:
         linkage: str = "average",
         fusion: str = "product",
         consensus: bool = False,
+        refine: bool = True,
     ):
         self.k, self.decider, self.about, self.over, self.neighbors = k, decider, about, over, neighbors
         self.budget, self.candidates, self.nepochs, self.seed = budget, candidates, nepochs, seed
         self.linkage, self.fusion, self.consensus = linkage, fusion, consensus
+        self.refine = refine
         self.decider = as_decider(decider)
         log.info("d-means decider: %s %s", type(self.decider).__name__, getattr(self.decider, "model", ""))
 
@@ -190,7 +193,7 @@ class DMeans:
         log.info("settled %d borderline points with Choice decisions, %d changed group", q, changed)
         return out
 
-    def _consensus(self, x: np.ndarray, texts: list[str]) -> np.ndarray | None:
+    def _consensus(self, x: np.ndarray, texts: list[str], decisions: np.ndarray | None = None) -> np.ndarray | None:
         """Use a joint embedding and lexical fit when the two views independently agree."""
         # Give the lexical projection room to resolve at least two dimensions per group.
         rank = min(64, len(x) - 1)
@@ -214,8 +217,34 @@ class DMeans:
         if adjusted_mutual_info_score(geometric_labels, lexical_labels) < 1 / 3:
             return None
         joint = np.column_stack((embedding, 0.3 * lexical))
+        if decisions is not None:
+            # Equal-length one-hot codes give the same penalty for any two different decisions.
+            codes = np.eye(self.k, dtype=joint.dtype)[decisions]
+            joint = np.column_stack((joint, 0.3 * codes))
         labels = KMeans(self.k, n_init=8, random_state=self.seed).fit_predict(joint)
         return labels if np.unique(labels).size == self.k else None
+
+    def _refine(self, x: np.ndarray, texts: list[str], labels: np.ndarray) -> np.ndarray:
+        joint = self._consensus(x, texts, labels)
+        if joint is not None:
+            self.refinement = "joint"
+            return joint
+        # Propagate a decision to an unqueried point only with a two-thirds local majority.
+        n_neighbors = min(10, len(x) - 1)
+        if n_neighbors < 3:
+            return labels
+        index = NearestNeighbors(n_neighbors=n_neighbors, metric="cosine").fit(x)
+        neighbors = index.kneighbors(return_distance=False)
+        out = labels.copy()
+        unasked = np.ones(len(x), dtype=bool)
+        unasked[self.asked] = False
+        for i in np.flatnonzero(unasked):
+            groups, counts = np.unique(labels[neighbors[i]], return_counts=True)
+            best = counts.argmax()
+            if 3 * counts[best] >= 2 * n_neighbors:
+                out[i] = groups[best]
+        self.refinement = "neighbors"
+        return out if np.unique(out).size == self.k else labels
 
     # --- fit -------------------------------------------------------------------------------
     def fit(self, x: np.ndarray, texts: list[str]) -> np.ndarray:
@@ -225,6 +254,7 @@ class DMeans:
             raise ValueError("x and texts must have the same length")
         self.pairs, self.p_same, self.asked, self.changed = [], np.zeros(0), np.zeros(0, dtype=np.int64), 0
         self.partition_source = "decision"
+        self.refinement = "none"
         if self.consensus:
             labels = self._consensus(x, texts)
             if labels is not None:
@@ -232,7 +262,7 @@ class DMeans:
                 self.engine = self.vocab = None
                 self.micro_centroids = np.empty((0, x.shape[1]), dtype=x.dtype)
                 self.micro_group = np.empty(0, dtype=np.int64)
-                self.merge_labels = self.labels = labels
+                self.merge_labels = self.decision_labels = self.labels = labels
                 self._record_report(len(x), 0.0)
                 return labels
         self.vocab = cards.Vocabulary(texts)
@@ -243,6 +273,9 @@ class DMeans:
         labels = gd.argmin(1)
         self.merge_labels = labels.copy()
         labels = self._settle(x, texts, gd, labels)
+        self.decision_labels = labels
+        if self.refine and not self.consensus and len(self.asked):
+            labels = self._refine(x, texts, labels)
         self.micro_centroids, self.micro_group, self.labels = mc, group, labels
         self._record_report(len(x), self.engine.epochs_run)
         return labels
@@ -250,6 +283,7 @@ class DMeans:
     def _record_report(self, n: int, epochs: float) -> None:
         decisions = len(self.pairs) + len(self.asked)
         self.report = {
+            "refinement": self.refinement,
             "micro_clusters": len(self.micro_centroids),
             "pair_decisions": len(self.pairs),
             "point_decisions": int(len(self.asked)),

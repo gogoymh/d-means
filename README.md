@@ -1,8 +1,5 @@
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/d-means-banner-dark.png">
-    <img alt="D-means: Decision model for clustering. A letter D of small spheres clustered at its corners." src="assets/d-means-banner.png" width="960">
-  </picture>
+  <img src="assets/d-means-hero.jpg" alt="D-means: Decision model for clustering. A sculpted D with three clusters of spheres." width="960">
 </h1>
 
 <p align="center">
@@ -310,7 +307,7 @@ The command writes `assets/d-means-banner-preview.png` with the light banner on 
 uv run python assets/banner.py --preview OUTDIR
 ```
 
-Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero uses these files. A light page shows `assets/d-means-banner.png`. A dark page shows `assets/d-means-banner-dark.png`, the same `prefers-color-scheme` switch as the convergence charts.
+Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero, `assets/d-means-hero.jpg`, is a separate image.
 
 ## License
 

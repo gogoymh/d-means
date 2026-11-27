@@ -83,10 +83,46 @@ def test_corners_are_denser(theme):
     assert (nearest == dominant).mean() >= 0.95
 
 
-def test_readme_shows_hero_banner():
-    head = (ROOT / "README.md").read_text().split("</h1>")[0]
-    assert '<img src="assets/d-means-hero.jpg"' in head
-    assert (ASSETS / "d-means-hero.jpg").is_file()
+def hero_html():
+    text = (ROOT / "README.md").read_text()
+    start = text.index("<h1")
+    return text[start:text.index("</h1>") + len("</h1>")]
+
+
+def test_readme_hero_shows_light_banner():
+    hero = hero_html()
+    assert '<img alt="' in hero
+    assert 'src="assets/d-means-banner.png"' in hero
+    assert (ASSETS / "d-means-banner.png").is_file()
+
+
+def test_readme_hero_switches_to_dark_banner():
+    hero = hero_html()
+    assert "<picture>" in hero and "</picture>" in hero
+    assert 'media="(prefers-color-scheme: dark)"' in hero
+    assert 'srcset="assets/d-means-banner-dark.png"' in hero
+    assert (ASSETS / "d-means-banner-dark.png").is_file()
+
+
+def test_readme_hero_alt_describes_beaded_d():
+    hero = hero_html()
+    assert 'alt="D-means: Decision model for clustering. A letter D of small spheres clustered at its corners."' in hero
+    assert "sculpted" not in hero
+
+
+def test_readme_drops_metallic_hero():
+    text = (ROOT / "README.md").read_text()
+    assert "d-means-hero.jpg" not in text
+    assert not (ASSETS / "d-means-hero.jpg").exists()
+
+
+def test_readme_says_hero_is_the_generated_banners():
+    text = (ROOT / "README.md").read_text()
+    section = text[text.index("## Banner preview"):]
+    assert "The README hero uses these files." in section
+    assert "A light page shows `assets/d-means-banner.png`." in section
+    assert "A dark page shows `assets/d-means-banner-dark.png`" in section
+    assert "prefers-color-scheme" in section
 
 
 def test_generated_banner_theme_dimensions_and_brightness():
@@ -125,3 +161,71 @@ def test_generator_reproduces_committed_banner(theme):
     fresh = banner.render(theme).astype(int)
     diff = np.abs(fresh - load(theme).astype(int))
     assert diff.max() <= 2 and diff.mean() < 0.05, (diff.max(), diff.mean())
+
+
+def _copy_banners(dest: Path, themes=("light", "dark")) -> None:
+    for theme in themes:
+        src = BANNERS[theme]
+        (dest / src.name).write_bytes(src.read_bytes())
+
+
+def test_preview_places_themes_side_by_side(tmp_path):
+    _copy_banners(tmp_path)
+    banner.main(["--preview", str(tmp_path)])
+    preview = banner.png_read(tmp_path / "d-means-banner-preview.png")[..., :3]
+    light, dark = load("light"), load("dark")
+    height, width, _ = light.shape
+    assert preview.shape == (height, width * 2, 3)
+    assert np.array_equal(preview[:, :width], light)
+    assert np.array_equal(preview[:, width:], dark)
+
+
+def test_preview_does_not_rerender(tmp_path, monkeypatch):
+    _copy_banners(tmp_path)
+
+    def fail(*_args, **_kwargs):
+        raise AssertionError("preview rendered a banner")
+
+    monkeypatch.setattr(banner, "render", fail)
+    banner.main(["--preview", str(tmp_path)])
+    assert (tmp_path / "d-means-banner-preview.png").is_file()
+
+
+@pytest.mark.parametrize("missing", ["light", "dark"])
+def test_preview_fails_when_a_theme_is_missing(tmp_path, missing):
+    keep = "dark" if missing == "light" else "light"
+    _copy_banners(tmp_path, (keep,))
+    with pytest.raises(SystemExit) as caught:
+        banner.main(["--preview", str(tmp_path)])
+    assert caught.value.code not in (0, None)
+    assert not (tmp_path / "d-means-banner-preview.png").exists()
+
+
+def test_readme_documents_banner_preview():
+    text = (ROOT / "README.md").read_text()
+    assert "uv run python assets/banner.py --preview" in text
+    assert "light banner on the left" in text
+    assert "dark banner on the right" in text
+
+
+def test_banner_doc_documents_preview_command():
+    doc = banner.__doc__ or ""
+    assert "uv run python assets/banner.py --preview" in doc
+    assert "light banner on the left" in doc
+    assert "dark banner on the right" in doc
+
+
+def test_render_command_still_writes_both_themes(tmp_path, monkeypatch):
+    calls = []
+
+    def fake(theme="light"):
+        calls.append(theme)
+        fill = 255 if theme == "light" else 0
+        return np.full((4, 6, 3), fill, np.uint8)
+
+    monkeypatch.setattr(banner, "render", fake)
+    banner.main([str(tmp_path)])
+    assert calls == ["light", "dark"]
+    assert (tmp_path / "d-means-banner.png").is_file()
+    assert (tmp_path / "d-means-banner-dark.png").is_file()
+    assert not (tmp_path / "d-means-banner-preview.png").exists()

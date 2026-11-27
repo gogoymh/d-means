@@ -1,5 +1,8 @@
 <h1 align="center">
-  <img src="assets/d-means-hero.jpg" alt="D-means: Decision model for clustering. A sculpted D with three clusters of spheres." width="960">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/d-means-banner-dark.png">
+    <img alt="D-means: Decision model for clustering. A letter D of small spheres clustered at its corners." src="assets/d-means-banner.png" width="960">
+  </picture>
 </h1>
 
 <p align="center">
@@ -294,6 +297,22 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 - **O-means** ([faiss contrib](https://github.com/owlgebra-ai/faiss/tree/main/contrib/o_means)): E-means with a two-level assignment. Centroids are grouped into cells and each row scans only its `nprobe` nearest cells. The idea is the IVF assignment of E-means Section 3.4, so credit for it belongs to the E-means paper. O-means reports reaching E-means' error 4.49x faster (geometric mean, one RTX 5090).
 
 Both are faster solvers for the same objective. D-means changes what gets decided.
+
+## Banner preview
+
+`assets/banner.py` draws two banners, light and dark, each 1536×512. Review both themes side by side after a renderer change:
+
+```bash
+uv run python assets/banner.py --preview
+```
+
+The command writes `assets/d-means-banner-preview.png` with the light banner on the left and the dark banner on the right. It stitches the PNGs already on disk. Pass a directory to review banners written there:
+
+```bash
+uv run python assets/banner.py --preview OUTDIR
+```
+
+Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero uses these files. A light page shows `assets/d-means-banner.png`. A dark page shows `assets/d-means-banner-dark.png`, the same `prefers-color-scheme` switch as the convergence charts.
 
 ## License
 

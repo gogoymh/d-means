@@ -91,7 +91,21 @@ The groups, probabilities, and scores below are illustrative, not benchmark outp
 
 **2. Find the ambiguous messages.** D-means ranks every message by the gap between its two nearest group centres and flags the closest 30%: **180 of these 600 messages**. The other 420 keep their K-means group.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/step-select-dark.svg">
+    <img alt="Margin is the second-nearest centre distance minus the nearest. A clear message has margin 1.63 and keeps its group; an ambiguous one has margin 0.08 and is asked. Of 600 messages ranked by margin, the first 180 are asked." src="assets/step-select-light.svg" width="900">
+  </picture>
+</p>
+
 **3. Ask the model.** For each flagged message the model reads the nearest group cards and answers: *which group shares the customer's banking issue of this text?* This multiple-option question is a **Choice** in the API. D-means multiplies the model's probability by a distance weight. For *"Why was I charged to send money?"* distance slightly favours transfer delays:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/step-ask-dark.svg">
+    <img alt="The model reads the message, the question and three shuffled group cards, and returns 0.85 for transfer fees, 0.10 for transfer delays and 0.05 for lost cards." src="assets/step-ask-light.svg" width="900">
+  </picture>
+</p>
 
 | Candidate group | Model probability | Distance weight | Product |
 |:--|--:|--:|--:|
@@ -99,7 +113,7 @@ The groups, probabilities, and scores below are illustrative, not benchmark outp
 | Transfer delays | 0.10 | 1.00 | 0.1000 |
 | Lost cards | 0.05 | 0.05 | 0.0025 |
 
-The largest product wins, so the message moves to **transfer fees**. Both the model's reading and the vector distances shape the final choice.
+The largest product wins, so the message moves to **transfer fees**. Both the model's reading and the vector distances shape the final choice. If the provider refuses to answer, every candidate gets the same probability, so distance alone decides and the message keeps its K-means group.
 
 <details><summary>Exact defaults and implementation details</summary>
 
@@ -256,7 +270,7 @@ TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 60.1% 
 StackExchange, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 37.5% (K-means, 16 epochs). D-means passes it at 1.96 epochs, 8x sooner than the fastest baseline gets there (K-means, 16 epochs).
 <!-- /bench:convergence -->
 
-Geometry converges, but to the wrong partition, and more epochs do not fix it. On the synthetic topics D-means is past the best baseline after one mini-batch. On real texts the picture is mixed: on StackExchange (k=50) D-means passes the best baseline at 2 epochs while E-means and O-means never get there, but on TREC (k=6) E-means touches the target first, at half an epoch, and then falls back below it. D-means keeps climbing on both and ends 8.7 points (TREC) and 5.0 points (StackExchange) above the best baseline. `bench.convergence --problems trec,stackexchange --seeds 0,1,2 --verify` replays the real curves offline.
+Geometry converges, but to the wrong partition, and more epochs do not fix it. On the synthetic topics D-means is past the best baseline after one mini-batch. On real texts D-means also gets there first: at 1.96 epochs on StackExchange (k=50), where E-means and O-means never reach the target, and at 3.84 epochs on TREC (k=6), where only O-means reaches it, at 16 epochs. D-means ends 4.2 points (TREC) and 5.0 points (StackExchange) above the best baseline. `bench.convergence --problems trec,stackexchange --seeds 0,1,2 --verify` replays the real curves offline.
 
 **Engines.** D-means' own NumPy E-means and O-means (`dmeans.EMeans`, `dmeans.OMeans`, used inside D-means and on bare vectors, not as benchmark baselines) reproduce what their authors report: E-means passes Lloyd's 25-iteration error within a few epochs, and O-means reaches it with a fraction of the distance computations.
 

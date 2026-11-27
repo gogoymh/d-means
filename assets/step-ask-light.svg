@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="350" viewBox="0 0 900 350" role="img" aria-label="The model reads the message and the shuffled group cards, then returns a probability per group.">
+<style>text{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;fill:#1f2328} .m{fill:#59636e} .mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace} .b{font-weight:700}</style>
+<rect width="900" height="350" rx="12" fill="#ffffff" stroke="#d1d9e0"/>
+<text x="28" y="40" font-size="19" class="b" text-anchor="start">What the decision model reads, and what it answers</text>
+<rect x="28" y="60" width="470" height="262" rx="10" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="48" y="90" font-size="13" class="m" text-anchor="start">Message</text>
+<text x="48" y="114" font-size="17" class="b" text-anchor="start" style="fill:#bf3989">“Why was I charged to send money?”</text>
+<text x="48" y="146" font-size="13" class="m" text-anchor="start">Question</text>
+<text x="48" y="168" font-size="15" class="" text-anchor="start">Which group shares the customer's banking issue?</text>
+<text x="48" y="198" font-size="13" class="m" text-anchor="start">Candidate group cards, shuffled</text>
+<rect x="48" y="208" width="430" height="30" rx="6" fill="#fdeee6"/>
+<rect x="48" y="208" width="5" height="30" rx="2" fill="#f47230"/>
+<text x="62" y="228" font-size="14" class="b" text-anchor="start" style="fill:#f47230">B</text>
+<text x="82" y="228" font-size="13" class="" text-anchor="start">pending, arrived  ·  “My transfer still hasn't arrived.”</text>
+<rect x="48" y="244" width="430" height="30" rx="6" fill="#e0f7f1"/>
+<rect x="48" y="244" width="5" height="30" rx="2" fill="#00b894"/>
+<text x="62" y="264" font-size="14" class="b" text-anchor="start" style="fill:#00b894">C</text>
+<text x="82" y="264" font-size="13" class="" text-anchor="start">card, lost, stolen  ·  “I lost my card yesterday.”</text>
+<rect x="48" y="280" width="430" height="30" rx="6" fill="#e6f0fc"/>
+<rect x="48" y="280" width="5" height="30" rx="2" fill="#257de0"/>
+<text x="62" y="300" font-size="14" class="b" text-anchor="start" style="fill:#257de0">A</text>
+<text x="82" y="300" font-size="13" class="" text-anchor="start">fee, charged  ·  “Why was I charged a transfer fee?”</text>
+<path d="M 512 190 L 548 190" stroke="#59636e" stroke-width="2"/><path d="M 546 184 L 556 190 L 546 196 Z" fill="#59636e"/>
+<text x="572" y="90" font-size="13" class="m" text-anchor="start">Model probability</text>
+<text x="572" y="118" font-size="15" class="b" text-anchor="start" style="fill:#257de0">A  transfer fees</text>
+<rect x="572" y="128" width="240" height="18" rx="4" fill="#d1d9e0"/>
+<rect x="572" y="128" width="204" height="18" rx="4" fill="#257de0"/>
+<text x="872" y="142" font-size="15" class="mono b" text-anchor="end">0.85</text>
+<text x="572" y="184" font-size="15" class="" text-anchor="start" style="fill:#f47230">B  transfer delays</text>
+<rect x="572" y="194" width="240" height="18" rx="4" fill="#d1d9e0"/>
+<rect x="572" y="194" width="24" height="18" rx="4" fill="#f47230"/>
+<text x="872" y="208" font-size="15" class="mono" text-anchor="end">0.10</text>
+<text x="572" y="250" font-size="15" class="" text-anchor="start" style="fill:#00b894">C  lost cards</text>
+<rect x="572" y="260" width="240" height="18" rx="4" fill="#d1d9e0"/>
+<rect x="572" y="260" width="12" height="18" rx="4" fill="#00b894"/>
+<text x="872" y="274" font-size="15" class="mono" text-anchor="end">0.05</text>
+</svg>

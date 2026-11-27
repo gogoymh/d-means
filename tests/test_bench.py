@@ -70,3 +70,14 @@ def test_each_model_keeps_its_own_files():
     assert semantic.MODEL == "cloudflare/clef"
     assert [p.name for p in semantic.paths(semantic.MODEL)] == ["clef-answers.jsonl.gz", "semantic-clef.json"]
     assert [p.name for p in semantic.paths(semantic.JEV)] == ["jev-answers.jsonl.gz", "semantic-jev.json"]
+
+
+def test_how_it_works_figures_match_their_generator():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("steps", ROOT / "assets" / "steps.py")
+    steps = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(steps)
+    for theme, colors in steps.THEMES.items():
+        assert (ROOT / "assets" / f"step-select-{theme}.svg").read_text() == steps.select(colors)
+        assert (ROOT / "assets" / f"step-ask-{theme}.svg").read_text() == steps.ask(colors)

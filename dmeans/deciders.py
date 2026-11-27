@@ -141,6 +141,10 @@ def as_decider(d) -> Decider:
     raise TypeError(f"decider must have ask(requests) -> answers or be a function fn(state, question); got {type(d).__name__}")
 
 
+# Provider replies that mean a policy refusal: OpenAI "refused to answer", Google "Input blocked".
+REFUSAL_MARKERS = ("refused to answer", "Input blocked")
+
+
 class Refused(RuntimeError):
     """The provider declined to answer this request (a policy refusal); asking again gets the same reply."""
 
@@ -165,7 +169,7 @@ def post_json(url: str, body: dict, key: str | None, label: str, attempts: int =
             msg = e.read()[:300].decode("utf-8", "replace")
             if e.code == 402:
                 raise RuntimeError(f"{label} HTTP 402: the account has no credits left") from e
-            if "refused to answer" in msg:
+            if any(m in msg for m in REFUSAL_MARKERS):
                 raise Refused(f"{label} HTTP {e.code}: {msg}") from e
             # Workers AI behind OpenRouter now and then rejects a valid request with a 400 "AiError"; it passes when resent.
             upstream = e.code == 400 and "AiError" in msg and attempt < 3

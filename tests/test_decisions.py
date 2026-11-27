@@ -22,9 +22,13 @@ class Fake(BaseHTTPRequestHandler):
         Fake.calls.append({"auth": self.headers["Authorization"], "body": body})
         if Fake.fail_next:
             code = Fake.fail_next.pop(0)
-            self.send_response(code)
+            msg = {
+                400: b'{"error":{"message":"HTTP 400: AiError: Bad input"}}',
+                502: b'{"error":{"message":"OpenAI refused to answer question \\"group\\"","code":502}}',
+                "blocked": b'{"error":{"message":"HTTP 400: Input blocked: The prompt contains sensitive words that violate Google\'s policy."}}',
+            }
+            self.send_response(400 if code == "blocked" else code)
             self.end_headers()
-            msg = {400: b'{"error":{"message":"HTTP 400: AiError: Bad input"}}', 502: b'{"error":{"message":"OpenAI refused to answer question \\"group\\"","code":502}}'}
             self.wfile.write(msg.get(code, b'{"error":{"message":"busy"}}'))
             return
         answers = {}
@@ -112,9 +116,10 @@ def test_slash_option_names_go_over_the_wire_without_slashes(server):
     assert req["questions"]["group"]["criteria"] == {"a / b": "one", "c / d": "two"}  # the caller's request is untouched
 
 
-def test_refusal_gets_a_neutral_answer_once_and_replays(server, tmp_path):
+@pytest.mark.parametrize("refusal", [502, "blocked"])  # OpenAI refusal, Google input block
+def test_refusal_gets_a_neutral_answer_once_and_replays(server, tmp_path, refusal):
     path = tmp_path / "answers.jsonl.gz"
-    Fake.fail_next = [502]
+    Fake.fail_next = [refusal]
     live = server("openai/gpt-6-luna-decisions", cache=path)
     ans = live.ask([REQ])[0]
     assert ans == {"group": {"sport": 0.5, "politics": 0.5}, "same": 0.5}

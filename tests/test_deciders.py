@@ -105,8 +105,13 @@ def test_function_decider_drives_dmeans(corpus):  # noqa: F811
         truth = label[state["text"]]
         return next((n for n, c in question["criteria"].items() if card_class(c) == truth), next(iter(question["criteria"])))
 
-    dm = DMeans(4, judge, over=3, seed=0)
+    dm = DMeans(4, judge, seed=0)  # default k-means start asks only point questions
     assert isinstance(dm.decider, FunctionDecider)
+    dm.fit(x, texts)
+    assert dm.report["pair_decisions"] == 0 and dm.report["point_decisions"] > 0
+
+    # The corpus interleaves classes in space, so only the merge path can recover them.
+    dm = DMeans(4, judge, over=3, seed=0, start="merge")
     lab = dm.fit(x, texts)
     assert dm.report["pair_decisions"] > 0 and dm.report["point_decisions"] > 0
     assert accuracy(y, lab) > 0.97
@@ -121,7 +126,9 @@ def test_rejects_bad_deciders_and_answers(corpus):  # noqa: F811
         def ask(self, reqs):
             return [{} for _ in reqs]
 
-    with pytest.raises(ValueError, match="no answer to question 'same'"):
+    with pytest.raises(ValueError, match="no answer to question 'group'"):
         DMeans(4, Forgetful(), seed=0).fit(x, texts)
+    with pytest.raises(ValueError, match="no answer to question 'same'"):
+        DMeans(4, Forgetful(), seed=0, start="merge").fit(x, texts)
     with pytest.raises(ValueError, match="names no option"):
         coerce(REQ["questions"]["group"], "chess", "group")

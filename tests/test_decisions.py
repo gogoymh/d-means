@@ -24,7 +24,8 @@ class Fake(BaseHTTPRequestHandler):
             code = Fake.fail_next.pop(0)
             self.send_response(code)
             self.end_headers()
-            self.wfile.write(b'{"error":{"message":"HTTP 400: AiError: Bad input"}}' if code == 400 else b'{"error":{"message":"busy"}}')
+            msg = {400: b'{"error":{"message":"HTTP 400: AiError: Bad input"}}', 502: b'{"error":{"message":"OpenAI refused to answer question \\"group\\"","code":502}}'}
+            self.wfile.write(msg.get(code, b'{"error":{"message":"busy"}}'))
             return
         answers = {}
         for qid, q in body["questions"].items():
@@ -109,3 +110,15 @@ def test_slash_option_names_go_over_the_wire_without_slashes(server):
     assert list(Fake.calls[0]["body"]["questions"]["group"]["criteria"]) == ["a | b", "c | d"]
     assert ans["group"] == {"a / b": 0.9, "c / d": 0.1}
     assert req["questions"]["group"]["criteria"] == {"a / b": "one", "c / d": "two"}  # the caller's request is untouched
+
+
+def test_refusal_gets_a_neutral_answer_once_and_replays(server, tmp_path):
+    path = tmp_path / "answers.jsonl.gz"
+    Fake.fail_next = [502]
+    live = server("openai/gpt-6-luna-decisions", cache=path)
+    ans = live.ask([REQ])[0]
+    assert ans == {"group": {"sport": 0.5, "politics": 0.5}, "same": 0.5}
+    assert len(Fake.calls) == 1 and live.stats["retries"] == 0  # a refusal is not retried
+    live.save()
+    offline = server("openai/gpt-6-luna-decisions", cache=path, offline=True)
+    assert offline.ask([REQ])[0] == ans and len(offline.refused) == 1

@@ -146,33 +146,54 @@ def model_results() -> dict[str, dict]:
     return out
 
 
-def models_table(study: dict) -> str:
-    """Compare decision models within the shipped d-means strategy."""
-    models = study["strategies"]["decision_only"]
-    abstentions = []
+# Column order of the decision-model table; each column reads that model's run of the default strategy.
+STUDY = ["cloudflare/clef", "google/gemini-decision-1", MODEL, "openai/gpt-6-luna-decisions", "liquid/d1.2-ultra"]
+
+
+def current_results() -> dict[str, dict]:
+    """Each STUDY model's committed run of the current default strategy, in STUDY order."""
+    out = {}
+    for model in STUDY:
+        f = paths(model, current=True)[1]
+        if f.exists():
+            res = json.loads(f.read_text())
+            if res.get("strategy") == "kmeans":
+                out[model] = res
+    return out
+
+
+def models_table(models: dict[str, dict]) -> str:
+    """Compare decision models within the shipped d-means strategy: ACC (%), best of each row in bold, "-" where not run."""
+    ref = max(models.values(), key=lambda r: len(r["datasets"]))  # baselines are the same in every file
     rows = [
         "| Dataset | Best baseline | " + " | ".join(MODELS[m] for m in models) + " |",
         "|:--|--:|" + "--:|" * len(models),
     ]
+    refusals = []
     for d in NAMES:
-        baseline = max(mean(row["acc"] for row in study["baselines"][d][m]) for m in BASELINES)
-        scores = [mean(row["acc"] for row in datasets[d]["scores"]) for datasets in models.values()]
-        values = [baseline, *scores]
-        best = max(values)
-        cells = [f"**{v * 100:.2f}**" if v == best else f"{v * 100:.2f}" for v in values]
-        for i, (model, datasets) in enumerate(models.items(), start=1):
-            count = datasets[d]["policy_abstentions"]
-            if count:
+        if d not in ref["datasets"]:
+            continue
+        baseline = max(ref["datasets"][d]["mean"][b]["acc"] for b in BASELINES)
+        values = [baseline] + [r["datasets"][d]["mean"]["d-means"]["acc"] if d in r["datasets"] else None for r in models.values()]
+        best = max(v for v in values if v is not None)
+        cells = ["-" if v is None else f"**{_pct(v)}**" if v == best else _pct(v) for v in values]
+        for i, (m, r) in enumerate(models.items(), start=1):
+            if r["datasets"].get(d, {}).get("refusals"):
                 cells[i] += " †"
-                abstentions.append(f"{MODELS[model]} on {_name(d)} ({count})")
+                refusals.append(f"{MODELS[m]} on {_name(d)} ({r['datasets'][d]['refusals']:,})")
         rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
-    if abstentions:
-        rows.extend([
-            "",
-            "† Refused requests received neutral probabilities: "
-            + ", ".join(abstentions) + ".",
-        ])
-    return "\n".join(rows)
+    lines = []
+    for m, r in models.items():
+        n = len(r["datasets"])
+        w = sum(r["datasets"][d]["mean"]["d-means"]["acc"] > max(r["datasets"][d]["mean"][b]["acc"] for b in BASELINES) for d in r["datasets"])
+        lines.append(f"{MODELS[m]} {w} of {n}")
+    note = f"\n\nACC (%), mean of seeds {', '.join(map(str, ref['seeds']))}. Datasets where D-means beats the best baseline: {_and(lines)}."
+    pending = [MODELS[m] for m, r in models.items() if len(r["datasets"]) < len(ref["datasets"])]
+    if pending:
+        note += f" A dash is a run not recorded yet: {_and(pending)} still need{'s' if len(pending) == 1 else ''} the remaining datasets."
+    if refusals:
+        note += f"\n\n† The provider refused some requests, which count as neutral answers (equal probabilities): {', '.join(refusals)}."
+    return "\n".join(rows) + note
 
 
 def ablation_table(res: dict) -> str:
@@ -308,7 +329,7 @@ def render(text: str) -> str:
     sem = json.loads((RESULTS / "semantic.json").read_text())
     models = model_results()
     widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
-    blocks = {"models": models_table(json.loads((RESULTS / "decision-model-comparison.json").read_text())), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
+    blocks = {"models": models_table(current_results()), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
     decision_results = RESULTS / "semantic-clef.json"
     if decision_results.exists():
         clef = json.loads(decision_results.read_text())

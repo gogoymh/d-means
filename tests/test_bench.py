@@ -1,67 +1,20 @@
-"""Benchmark bookkeeping, offline: stage diagnostics, drift checks, and the README it renders."""
+"""Benchmark bookkeeping, offline: drift checks, file names, and the README it renders."""
 
 import copy
 import json
-import re
 from pathlib import Path
 
-import numpy as np
-
 from bench import report, semantic
-from dmeans import DMeans
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-class Perfect:
-    """A decision model that knows the classes: answers from the class word in each text."""
-
-    def ask(self, reqs):
-        def cls(t):
-            return t.split()[0]
-
-        def card_cls(card):
-            words = [cls(t) for t in card["examples"]]
-            return max(set(words), key=words.count)
-
-        out = []
-        for r in reqs:
-            q = next(iter(r["questions"].values()))
-            if q["type"] == "noul":
-                same = card_cls(r["state"]["group_a"]) == card_cls(r["state"]["group_b"])
-                out.append({"same": 0.95 if same else 0.05})
-            else:
-                truth = cls(r["state"]["text"])
-                out.append({"group": {n: float(card_cls(c) == truth) for n, c in q["criteria"].items()}})
-        return out
-
-
-def test_diagnose_reads_each_stage():
-    rng = np.random.default_rng(3)
-    modes = rng.normal(size=(6, 8)).astype(np.float32) * 3
-    names = ["alpha", "beta", "gamma"]
-    x, texts, y = [], [], []
-    for m in range(6):
-        for i in range(40):
-            x.append(modes[m] + rng.normal(size=8).astype(np.float32))
-            texts.append(f"{names[m % 3]} item {m} number {i}")
-            y.append(m % 3)
-    x, y = np.array(x), np.array(y)
-    dm = DMeans(3, Perfect(), seed=0, consensus=False, start="merge")
-    dm.fit(x, texts)
-    d = semantic.diagnose(dm, x, y)
-    assert 0.9 <= d["purity"] <= 1.0
-    assert d["noul_auc"] > 0.95
-    assert d["moved_wrong"] == 0
-    assert 0.0 < d["pair_same_rate"] < 1.0
-
-
 def _result(accs: dict[str, tuple[float, float]]) -> dict:
-    """A fake semantic.json: per dataset, (best baseline acc, d-means acc)."""
+    """A fake results file: per dataset, (best baseline acc, d-means acc)."""
     out = {"seeds": [0], "usd_per_decision": {"a": 1e-5}, "jev_answers": 1234, "datasets": {}}
     for name, (base, dm) in accs.items():
         row = lambda a: {"acc": a, "nmi": a, "ari": a}  # noqa: E731
-        runs = {"k-means": [row(base)], "e-means": [row(base - 0.01)], "o-means": [row(base - 0.02)], "d-means": [{**row(dm), "decisions": 100.0, "purity": 0.9}]}
+        runs = {"k-means": [row(base)], "e-means": [row(base - 0.01)], "o-means": [row(base - 0.02)], "d-means": [{**row(dm), "decisions": 100.0}]}
         out["datasets"][name] = {"n": 10, "k": 2, "runs": runs, "mean": {m: dict(r[0]) for m, r in runs.items()}}
     return out
 
@@ -71,8 +24,8 @@ def test_verify_flags_drift_but_not_losses():
     assert semantic.verify(copy.deepcopy(ref), ref) == []
     assert semantic.losses(ref) == {"a": [], "b": ["acc", "nmi", "ari"]}
     drift = copy.deepcopy(ref)
-    drift["datasets"]["a"]["runs"]["d-means"][0]["purity"] = 0.8
-    assert any("purity" in e for e in semantic.verify(drift, ref))
+    drift["datasets"]["a"]["runs"]["d-means"][0]["decisions"] = 90.0
+    assert any("decisions" in e for e in semantic.verify(drift, ref))
     extra = _result({"a": (0.5, 0.6), "c": (0.5, 0.6)})
     assert semantic.verify(extra, ref) == ["c: not in the committed results"]
 
@@ -94,10 +47,9 @@ def test_readme_explains_each_dataset_d_means_loses_on():
     if not any(semantic.losses(res).values()):
         return
     section = readme.split("### Where D-means loses", 1)[1].split("\n## ", 1)[0]
-    prose = re.sub(r"<!-- bench:diagnose -->.*?<!-- /bench:diagnose -->", "", section, flags=re.S)
     for name, lost in semantic.losses(res).items():
         if lost:
-            assert f"**{report.NAMES[name]}**" in prose, f"README gives no cause for {name}"
+            assert f"**{report.NAMES[name]}**" in section, f"README gives no cause for {name}"
 
 
 
@@ -114,8 +66,7 @@ def test_models_table_bolds_the_best_and_counts_wins():
     assert "Gemini Decision 1 still needs the remaining datasets." in partial
 
 
-def test_jev_current_strategy_keeps_its_own_files():
-    answers, out = semantic.paths(semantic.MODEL, current=True)
-    assert (answers.name, out.name) == ("jev-kmeans-answers.jsonl.gz", "semantic-jev-kmeans.json")
-    assert semantic.paths(semantic.MODEL)[1].name == "semantic.json"
-    assert semantic.paths("cloudflare/clef", current=True) == semantic.paths("cloudflare/clef")
+def test_each_model_keeps_its_own_files():
+    assert semantic.MODEL == "cloudflare/clef"
+    assert [p.name for p in semantic.paths(semantic.MODEL)] == ["clef-answers.jsonl.gz", "semantic-clef.json"]
+    assert [p.name for p in semantic.paths(semantic.JEV)] == ["jev-answers.jsonl.gz", "semantic-jev.json"]

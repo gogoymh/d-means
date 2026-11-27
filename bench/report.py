@@ -5,7 +5,6 @@
 """
 
 import argparse
-import gzip
 import json
 import re
 import sys
@@ -13,7 +12,7 @@ from pathlib import Path
 from statistics import mean
 
 from . import chart
-from .semantic import ANSWERS, BASELINES, MODEL, MODELS, RESULTS, losses, paths
+from .semantic import BASELINES, JEV, MODEL, MODELS, RESULTS, losses, paths
 
 README = Path(__file__).resolve().parent.parent / "README.md"
 ASSETS = README.parent / "assets"
@@ -56,7 +55,7 @@ def _and(items: list[str]) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
-def summary(res: dict, *, consensus: bool = False) -> str:
+def summary(res: dict) -> str:
     """One generated paragraph: where d-means wins, where it trails, and what backs the numbers."""
     ds = list(res["datasets"])
     lost = losses(res)
@@ -75,19 +74,16 @@ def summary(res: dict, *, consensus: bool = False) -> str:
             mean = res["datasets"][d]["mean"]
             trails.append(f"{_name(d)} ({', '.join(METRIC[m] + ' ' + _delta(mean, m) for m in lost[d])})")
     if trails:
-        out += f" It trails on {_and(trails)}; [why](#where-d-means-loses)."
+        out += f" It trails on {_and(trails)}."
     model = res.get("jev_model", MODEL)
     answers = paths(model)[0]
     n = res.get("jev_answers")
-    if n is None and model == MODEL and ANSWERS.exists():
-        with gzip.open(ANSWERS, "rt") as f:
-            n = sum(1 for _ in f)
-    if n and not consensus:
+    if n:
         out += f" Every D-means number comes from {MODELS.get(model, model)} answers through OpenRouter ({n:,} decisions, committed in [`bench/results/{answers.name}`](bench/results/{answers.name}))."
     return out
 
 
-def semantic_table(res: dict, *, consensus: bool = False) -> str:
+def semantic_table(res: dict) -> str:
     ds = list(res["datasets"])
     model = res.get("jev_model", MODEL)
     headers = [method.capitalize().replace("-", "&#8209;") for method in METHODS]
@@ -104,8 +100,6 @@ def semantic_table(res: dict, *, consensus: bool = False) -> str:
         r = res["datasets"][d]
         usd = _usd(res, d)
         cost = "-" if usd is None else f"${usd:.3f}"
-        if consensus and not r["mean"]["d-means"]["decisions"]:
-            cost = "$0"
         rows.append(f"| {_name(d)} | " + " | ".join(_cells(r["mean"], "acc")) + " |")
         run_details.append(
             f"| {_name(d)} | {r['n']:,} | {r['k']} | {_delta(r['mean'], 'acc')} | {cost} |"
@@ -119,15 +113,12 @@ def semantic_table(res: dict, *, consensus: bool = False) -> str:
         detail.append(f"| {_name(d)} | " + " | ".join(_cells(mean, "nmi") + _cells(mean, "ari")) + " |")
     seeds = ", ".join(map(str, res["seeds"]))
     model_name = MODELS.get(model, model)
-    if consensus:
-        evidence = f"D-means uses embedding–lexical consensus where the views agree and {model_name} otherwise. "
-    else:
-        evidence = f"D-means uses {model_name}. "
+    evidence = f"D-means uses {model_name}. "
     return (
         "\n".join(rows)
         + f"\n\nClustering accuracy (%), mean of seeds {seeds}. "
         + evidence
-        + summary(res, consensus=consensus)
+        + summary(res)
         + "\n\n<details><summary>Run details, NMI and ARI</summary>\n\n"
         + "\n".join(run_details)
         + "\n\nLead is the accuracy difference from the best baseline, in percentage points.\n\n"
@@ -136,25 +127,15 @@ def semantic_table(res: dict, *, consensus: bool = False) -> str:
     )
 
 
-def model_results() -> dict[str, dict]:
-    """Every decision model with a committed results file, Jev (the main table) first."""
-    out = {}
-    for model in [MODEL] + sorted(set(MODELS) - {MODEL}):
-        f = paths(model)[1]
-        if f.exists():
-            out[model] = json.loads(f.read_text())
-    return out
-
-
 # Column order of the decision-model table; each column reads that model's run of the default strategy.
-STUDY = ["cloudflare/clef", "google/gemini-decision-1", MODEL, "openai/gpt-6-luna-decisions", "liquid/d1.2-ultra"]
+STUDY = [MODEL, "google/gemini-decision-1", JEV, "openai/gpt-6-luna-decisions", "liquid/d1.2-ultra"]
 
 
 def current_results() -> dict[str, dict]:
     """Each STUDY model's committed run of the current default strategy, in STUDY order."""
     out = {}
     for model in STUDY:
-        f = paths(model, current=True)[1]
+        f = paths(model)[1]
         if f.exists():
             res = json.loads(f.read_text())
             if res.get("strategy") == "kmeans":
@@ -192,7 +173,10 @@ def models_table(models: dict[str, dict]) -> str:
     if pending:
         note += f" A dash is a run not recorded yet: {_and(pending)} still need{'s' if len(pending) == 1 else ''} the remaining datasets."
     if refusals:
-        note += f"\n\n† The provider refused some requests, which count as neutral answers (equal probabilities): {', '.join(refusals)}."
+        note += (
+            f"\n\n† The provider refused some requests, which count as neutral answers (equal probabilities): {', '.join(refusals)}. "
+            "A refused point keeps its K-means assignment and stays in the accuracy denominator."
+        )
     return "\n".join(rows) + note
 
 
@@ -212,37 +196,6 @@ def ablation_table(res: dict) -> str:
         span = "0" if not any(dpp) else f"{min(dpp):.2f}" if f"{min(dpp):.2f}" == f"{max(dpp):.2f}" else f"{min(dpp):.2f} to {max(dpp):.2f}"
         rows.append(f"| {'**D-means (default)**' if m == 'd-means' else m} | " + " | ".join(_pct(v["acc"]) for v in means) + f" | {span} |")
     return "\n".join(rows) + "\n\nACC (%), mean of the same seeds."
-
-
-def diagnose_table(res: dict, model: str = MODEL) -> str:
-    """The "Where d-means loses" section, for `model`'s run; empty until a live run has recorded stage diagnostics."""
-    name = MODELS.get(model, model).split(" ")[0]
-    if not any("purity" in r["mean"]["d-means"] for r in res["datasets"].values()):
-        return ""
-    rows = [
-        f"| Dataset | best baseline | micro-cluster purity | geometric merge | {name} merge | after settle | Noul AUC | settle moves right / wrong |",
-        "|:--|--:|--:|--:|--:|--:|--:|--:|",
-    ]
-    for d, r in res["datasets"].items():
-        mean = r["mean"]
-        dm = mean["d-means"]
-        auc = f"{dm['noul_auc']:.2f}" if "noul_auc" in dm else "-"
-        moves = f"{dm['moved_right']:.0f} / {dm['moved_wrong']:.0f}" if "moved_right" in dm else "-"
-        cells = [
-            _pct(max(mean[b]["acc"] for b in BASELINES)),
-            _pct(dm["purity"]) if "purity" in dm else "-",
-            _pct(mean["geometric merge (no decisions)"]["acc"]) if "geometric merge (no decisions)" in mean else "-",
-            _pct(mean["merge only (no point decisions)"]["acc"]) if "merge only (no point decisions)" in mean else "-",
-            _pct(dm["acc"]),
-            auc,
-            moves,
-        ]
-        rows.append(f"| {_name(d)} | " + " | ".join(cells) + " |")
-    return "### Where D-means loses\n\n" + "\n".join(rows) + (
-        f"\n\nACC (%) after each stage of a default run with {MODELS.get(model, model)}, mean of the same seeds. *Purity* is the ceiling for any merge of the 3k micro-clusters. "
-        f"*Noul AUC* ranks {name}'s p(same) on the asked pairs against \"same majority class\" (0.5 is chance). "
-        "*Settle moves* count borderline points that left a group of another class for their own, and the reverse, per run."
-    )
 
 
 def mse_table(res: dict) -> str:
@@ -326,16 +279,8 @@ def charts() -> dict[Path, str]:
 
 
 def render(text: str) -> str:
-    sem = json.loads((RESULTS / "semantic.json").read_text())
-    models = model_results()
-    widest = max(models, key=lambda m: len(models[m]["datasets"]))  # use the broadest run for the main table and diagnostics
-    blocks = {"models": models_table(current_results()), "ablation": ablation_table(sem), "diagnose": diagnose_table(models[widest], widest)}
-    decision_results = RESULTS / "semantic-clef.json"
-    if decision_results.exists():
-        clef = json.loads(decision_results.read_text())
-        blocks["semantic"] = semantic_table(clef)
-        if "k-means start only (no decisions)" in next(iter(clef["datasets"].values()))["runs"]:
-            blocks["ablation"] = ablation_table(clef)  # the default strategy's own ablations
+    main = json.loads(paths(MODEL)[1].read_text())
+    blocks = {"semantic": semantic_table(main), "ablation": ablation_table(main), "models": models_table(current_results())}
     if (RESULTS / "mse.json").exists():
         blocks["mse"] = mse_table(json.loads((RESULTS / "mse.json").read_text()))
     if (RESULTS / "convergence.json").exists():

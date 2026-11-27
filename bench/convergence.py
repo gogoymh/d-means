@@ -31,7 +31,7 @@ from dmeans.deciders import CacheMiss, Decisions, request_key
 from dmeans.metrics import accuracy
 
 from . import official
-from .semantic import MODEL, RESULTS
+from .semantic import JEV, RESULTS
 
 log = _log.get("bench.convergence")
 OUT = RESULTS / "convergence.json"
@@ -119,7 +119,7 @@ def _real(name: str, live: bool) -> tuple[dict, Decisions]:
 
     ds = data.load(name)
     prob = {"x": embed.embed(name, ds.texts), "texts": ds.texts, "labels": ds.labels, "k": ds.k, "about": ds.about}
-    return prob, Decisions(MODEL, ANSWERS, offline=not live)
+    return prob, Decisions(JEV, ANSWERS, offline=not live)
 
 
 def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:

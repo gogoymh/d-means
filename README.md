@@ -106,7 +106,7 @@ The largest product wins, so the message moves to **transfer fees**. Both the mo
 - **Start (`start="kmeans"`):** scikit-learn `KMeans(k, n_init=restarts)`, `restarts=10`, seeded by `seed`. Cards use class-based TF-IDF keywords and up to four texts nearest the group's mean vector.
 - **Point selection:** `budget=0.30`; ask about `round(0.30 × n)` points with the smallest gap between their two nearest centroid distances.
 - **Final choice:** `candidates=5`, capped at `k`, in a shuffled order. For each candidate, the distance weight is `exp(−(distance − closest_distance) / tau)`, where `tau` is the median gap across the corpus (or `1e-6` if zero). Multiply this by the model probability (with `1e-6` smoothing) and take the largest score.
-- **v1 merge path (`start="merge"`):** over-cluster into `3k` E-means micro-clusters, ask a same-topic **Noul** for each micro-cluster and its six nearest neighbours, merge to `k` by average linkage on `1 − p`, then settle as above. It can repair structure that geometry gets wrong, as the synthetic chart below shows, but real decision models answer these pairwise questions too strictly to merge well on news topics. It stays available, and the legacy Jev and convergence results replay with it.
+- **v1 merge path (`start="merge"`):** over-cluster into `3k` E-means micro-clusters, ask a same-topic **Noul** for each micro-cluster and its six nearest neighbours, merge to `k` by average linkage on `1 − p`, then settle as above. It can repair structure that geometry gets wrong, as the synthetic chart below shows, but real decision models answer these pairwise questions too strictly to merge well on news topics. It stays available, and the convergence charts replay with it.
 - **Optional consensus check (`consensus=True`):** compare K-means partitions of the embeddings and a low-rank TF-IDF view by adjusted mutual information; at `1/3` or more, return a joint fit with zero model calls. Excluded from the benchmark.
 
 `model.report` records point decisions and points moved; `model.merge_labels` holds the partition before the model spoke.
@@ -175,18 +175,17 @@ Each column runs the default D-means strategy and changes only the decision mode
 
 ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: Clef 6 of 6, Gemini Decision 1 6 of 6, Jev 1.14 5 of 6, Luna Decisions 4 of 6 and d1.2-ultra 6 of 6.
 
-† The provider refused some requests, which count as neutral answers (equal probabilities): Luna Decisions on StackExchange (148), Luna Decisions on AG News (148), Luna Decisions on BBC News (5), Gemini Decision 1 on 20 Newsgroups (5), Luna Decisions on 20 Newsgroups (43), Luna Decisions on Banking77 (9).
+† The provider refused some requests, which count as neutral answers (equal probabilities): Luna Decisions on StackExchange (148), Luna Decisions on AG News (148), Luna Decisions on BBC News (5), Gemini Decision 1 on 20 Newsgroups (5), Luna Decisions on 20 Newsgroups (43), Luna Decisions on Banking77 (9). A refused point keeps its K-means assignment and stays in the accuracy denominator.
 <!-- /bench:models -->
 
-Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`, and `--current --verify` for Jev. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
+Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
 
 ## Benchmark
 
 ```bash
-uv run python -m bench.semantic --model cloudflare/clef --verify  # current default strategy, offline
-uv run python -m bench.semantic --verify   # offline replay of the legacy Jev results
-uv run python -m bench.semantic --current --verify  # Jev with the default strategy, offline
-uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
+uv run python -m bench.semantic --verify   # main table with Clef, offline replay
+uv run python -m bench.semantic --model typesafe/jev-1.14 --verify  # any other decision model
+uv run python -m bench.semantic --live     # ask Clef again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
 uv run pytest                              # offline tests
@@ -208,10 +207,6 @@ Datasets: [TREC](https://huggingface.co/datasets/SetFit/TREC-QC) questions by an
 
 ACC (%), mean of the same seeds.
 <!-- /bench:ablation -->
-
-<!-- bench:diagnose -->
-
-<!-- /bench:diagnose -->
 
 **Why the merge path is no longer the default.** With Clef, the v1 merge path trailed on AG News, BBC News and 20 Newsgroups. Its micro-clusters were pure enough (95% on BBC News), but Clef answered "different topic" to most pairs from the same class, so average linkage merged on noise. Starting from K-means and spending the model's calls on the boundary wins on all six datasets. The merge path still scores higher on TREC (66.8 against 62.0), where answer type cuts across the embedding's topics; pass `start="merge"` when categories do not follow topical similarity.
 
@@ -295,22 +290,6 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 
 Both are faster solvers for the same objective. D-means changes what gets decided.
 
-## Banner preview
-
-`assets/banner.py` draws two banners, light and dark, each 1536×512. Review both themes side by side after a renderer change:
-
-```bash
-uv run python assets/banner.py --preview
-```
-
-The command writes `assets/d-means-banner-preview.png` with the light banner on the left and the dark banner on the right. It stitches the PNGs already on disk. Pass a directory to review banners written there:
-
-```bash
-uv run python assets/banner.py --preview OUTDIR
-```
-
-Regenerate the two PNGs with `uv run python assets/banner.py`. The README hero, `assets/d-means-hero.jpg`, is a separate image.
-
 ## License
 
-MIT. Dependencies are NumPy, SciPy and scikit-learn (BSD). `dmeans.EMeans` and `dmeans.OMeans` are reimplemented from their public descriptions. The benchmark baselines use the official E-means and O-means code (faiss, MIT; dev dependencies `faiss-cpu` and `torch`).
+MIT.

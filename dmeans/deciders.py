@@ -141,6 +141,15 @@ def as_decider(d) -> Decider:
     raise TypeError(f"decider must have ask(requests) -> answers or be a function fn(state, question); got {type(d).__name__}")
 
 
+class Refused(RuntimeError):
+    """The provider declined to answer this request (a policy refusal); asking again gets the same reply."""
+
+
+def neutral(req: dict) -> dict:
+    """The answer that carries no information: 0.5 for a Noul, equal probabilities for a Choice."""
+    return {qid: coerce(q, {} if q.get("type") == "choice" else 0.5, qid) for qid, q in req["questions"].items()}
+
+
 # --- cached remote models --------------------------------------------------------------------
 def post_json(url: str, body: dict, key: str | None, label: str, attempts: int = 8, timeout: float = 90, on_retry: Callable[[], None] | None = None) -> dict:
     """POST JSON with bearer auth, retrying busy and network errors with exponential backoff."""
@@ -156,6 +165,8 @@ def post_json(url: str, body: dict, key: str | None, label: str, attempts: int =
             msg = e.read()[:300].decode("utf-8", "replace")
             if e.code == 402:
                 raise RuntimeError(f"{label} HTTP 402: the account has no credits left") from e
+            if "refused to answer" in msg:
+                raise Refused(f"{label} HTTP {e.code}: {msg}") from e
             # Workers AI behind OpenRouter now and then rejects a valid request with a 400 "AiError"; it passes when resent.
             upstream = e.code == 400 and "AiError" in msg and attempt < 3
             if e.code not in RETRY_CODES and not upstream:
@@ -185,6 +196,7 @@ class CachedDecider:
         self.new: dict[str, dict] = {}
         self.lock = threading.Lock()
         self.used: set[str] = set()
+        self.refused: set[str] = set()  # requests the provider declined; answered neutrally and kept in the cache
         self.stats = {"requests": 0, "cache_hits": 0, "api_calls": 0, "input_tokens": 0, "cost_usd": 0.0, "retries": 0}
         self.models_seen: set[str] = set()
         if self.path and self.path.exists():
@@ -192,6 +204,8 @@ class CachedDecider:
                 for line in f:
                     row = json.loads(line)
                     self.store[row["k"]] = row["a"]
+                    if row.get("refused"):
+                        self.refused.add(row["k"])
             log.info("loaded %d cached %s answers from %s", len(self.store), self.label, self.path)
 
     def _call(self, req: dict) -> dict:
@@ -226,7 +240,13 @@ class CachedDecider:
                 return hit
         if self.offline:
             raise CacheMiss(k)
-        ans = self._call(req)
+        try:
+            ans = self._call(req)
+        except Refused as e:
+            log.warning("%s %s refused request %s, answering neutrally: %s", self.label, self.model, k[:12], e)
+            ans = neutral(req)
+            with self.lock:
+                self.refused.add(k)
         with self.lock:
             self.store[k] = ans
             self.new[k] = ans
@@ -264,7 +284,7 @@ class CachedDecider:
         tmp = self.path.with_suffix(f".{threading.get_ident()}.tmp")
         with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=9) as f:
             for k in sorted(rows):
-                f.write(json.dumps({"k": k, "a": rows[k]}, separators=(",", ":")) + "\n")
+                f.write(json.dumps({"k": k, "a": rows[k], **({"refused": True} if k in self.refused else {})}, separators=(",", ":")) + "\n")
         tmp.replace(self.path)
         log.info("saved %d %s answers to %s", len(rows), self.label, self.path)
 

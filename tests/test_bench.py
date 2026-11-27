@@ -99,3 +99,23 @@ def test_readme_explains_each_dataset_d_means_loses_on():
         if lost:
             assert f"**{report.NAMES[name]}**" in prose, f"README gives no cause for {name}"
 
+
+
+def test_models_table_bolds_the_best_and_counts_wins():
+    clef = _result({"trec": (0.58, 0.62), "banking77": (0.63, 0.68)})
+    gemini = _result({"trec": (0.58, 0.64), "banking77": (0.63, 0.60)})
+    table = report.models_table({"cloudflare/clef": clef, "google/gemini-decision-1": gemini})
+    assert "| Dataset | Best baseline | Clef | Gemini Decision 1 |" in table
+    assert "| TREC | 58.0 | 62.0 | **64.0** |" in table
+    assert "| Banking77 | 63.0 | **68.0** | 60.0 |" in table
+    assert "beats the best baseline: Clef 2 of 2 and Gemini Decision 1 1 of 2." in table
+    partial = report.models_table({"cloudflare/clef": clef, "google/gemini-decision-1": _result({"trec": (0.58, 0.64)})})
+    assert "| Banking77 | 63.0 | **68.0** | - |" in partial
+    assert "Gemini Decision 1 still needs the remaining datasets." in partial
+
+
+def test_jev_current_strategy_keeps_its_own_files():
+    answers, out = semantic.paths(semantic.MODEL, current=True)
+    assert (answers.name, out.name) == ("jev-kmeans-answers.jsonl.gz", "semantic-jev-kmeans.json")
+    assert semantic.paths(semantic.MODEL)[1].name == "semantic.json"
+    assert semantic.paths("cloudflare/clef", current=True) == semantic.paths("cloudflare/clef")

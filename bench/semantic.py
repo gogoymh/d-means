@@ -58,9 +58,14 @@ def slug(model: str) -> str:
     return name.split("-1.")[0] if name.startswith("jev") else name
 
 
-def paths(model: str = MODEL) -> tuple[Path, Path]:
-    """(answer cache, results file) of one decision model; Jev keeps the original names."""
+def paths(model: str = MODEL, current: bool = False) -> tuple[Path, Path]:
+    """(answer cache, results file) of one decision model; Jev keeps the original names.
+
+    Jev's original files hold the v1 merge strategy; `current=True` names its run of the default strategy.
+    """
     s = slug(model)
+    if current and model == MODEL:
+        return RESULTS / f"{s}-kmeans-answers.jsonl.gz", RESULTS / f"semantic-{s}-kmeans.json"
     return RESULTS / f"{s}-answers.jsonl.gz", RESULTS / ("semantic.json" if model == MODEL else f"semantic-{s}.json")
 
 
@@ -162,7 +167,7 @@ def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool =
         "datasets": {},
     }
     for name in datasets:
-        calls0, cost0 = jev.stats["api_calls"], jev.stats["cost_usd"]
+        calls0, cost0, used0 = jev.stats["api_calls"], jev.stats["cost_usd"], set(jev.used)
         ds = data.load(name)
         x = embed.embed(name, ds.texts)
         y = ds.labels
@@ -206,6 +211,10 @@ def run(datasets: list[str], seeds: list[int], jev: Decisions, ablations: bool =
             "runs": res,
             "mean": {m: _mean(r) for m, r in res.items()},
         }
+        refused = len((jev.used - used0) & jev.refused)
+        if refused:
+            out["datasets"][name]["refusals"] = refused  # answered with neutral probabilities
+            log.info("%s: %s refused %d requests, answered neutrally", name, jev.model, refused)
     return out
 
 
@@ -265,10 +274,11 @@ def main(argv: list[str] | None = None) -> int:
     strategy = ap.add_mutually_exclusive_group()
     strategy.add_argument("--refined", action="store_true", help="evaluate the current decision-guided refinement")
     strategy.add_argument("--consensus", action="store_true", help="benchmark the adaptive embedding and lexical consensus strategy")
+    strategy.add_argument("--current", action="store_true", help="run Jev with the current default strategy (other models always use it)")
     ap.add_argument("--no-ablations", action="store_true")
     a = ap.parse_args(argv)
     _log.setup()
-    answers, legacy_out = paths(a.model)
+    answers, legacy_out = paths(a.model, current=a.current)
     out = legacy_out
     if a.consensus:
         out = RESULTS / f"semantic-consensus-{slug(a.model)}.json"
@@ -279,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
         names = a.datasets.split(",") if a.datasets else committed(out)
         seeds = [int(s) for s in a.seeds.split(",")]
         # Jev and consensus results were recorded with the v1 merge strategy.
-        legacy = a.consensus or a.model == MODEL
+        legacy = a.consensus or (a.model == MODEL and not a.current)
         if a.consensus or a.refined:
             with threadpool_limits(4):
                 result = run(names, seeds, jev, ablations=False, consensus=a.consensus, legacy=a.consensus, refine=a.refined)

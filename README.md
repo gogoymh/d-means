@@ -109,7 +109,7 @@ The largest product wins, so the message moves to **transfer fees**. Both the mo
 - **Start (`start="kmeans"`):** scikit-learn `KMeans(k, n_init=restarts)`, `restarts=10`, seeded by `seed`. Cards use class-based TF-IDF keywords and up to four texts nearest the group's mean vector.
 - **Point selection:** `budget=0.30`; ask about `round(0.30 × n)` points with the smallest gap between their two nearest centroid distances.
 - **Final choice:** `candidates=5`, capped at `k`, in a shuffled order. For each candidate, the distance weight is `exp(−(distance − closest_distance) / tau)`, where `tau` is the median gap across the corpus (or `1e-6` if zero). Multiply this by the model probability (with `1e-6` smoothing) and take the largest score.
-- **v1 merge path (`start="merge"`):** over-cluster into `3k` E-means micro-clusters, ask a same-topic **Noul** for each micro-cluster and its six nearest neighbours, merge to `k` by average linkage on `1 − p`, then settle as above. It can repair structure that geometry gets wrong, as the synthetic chart below shows, but real decision models answer these pairwise questions too strictly to merge well on news topics. It stays available, and the recorded Jev, convergence and model-comparison results replay with it.
+- **v1 merge path (`start="merge"`):** over-cluster into `3k` E-means micro-clusters, ask a same-topic **Noul** for each micro-cluster and its six nearest neighbours, merge to `k` by average linkage on `1 − p`, then settle as above. It can repair structure that geometry gets wrong, as the synthetic chart below shows, but real decision models answer these pairwise questions too strictly to merge well on news topics. It stays available, and the legacy Jev and convergence results replay with it.
 - **Optional consensus check (`consensus=True`):** compare K-means partitions of the embeddings and a low-rank TF-IDF view by adjusted mutual information; at `1/3` or more, return a joint fit with zero model calls. Excluded from the benchmark.
 
 `model.report` records point decisions and points moved; `model.merge_labels` holds the partition before the model spoke.
@@ -164,30 +164,29 @@ DMeans(k, decider=lambda state, question: ...)                # your own functio
 
 ### Decision models
 
-Each column runs the same D-means strategy and changes only the decision model it can call. This study was recorded with the v1 merge strategy (`start="merge"`) against single-initialization K-means, before the current default. Accuracy (%) is averaged over seeds 0, 1, and 2. The best baseline is the highest mean among K-means, E-means, and O-means.
+Each column runs the default D-means strategy and changes only the decision model it calls. The best baseline is the highest mean among K-means (best of 10 initializations), E-means and O-means.
 
 <!-- bench:models -->
 | Dataset | Best baseline | Clef | Gemini Decision 1 | Jev 1.14 | Luna Decisions | d1.2-ultra |
 |:--|--:|--:|--:|--:|--:|--:|
-| TREC | 58.13 | **66.80** | 59.60 | 65.93 | 55.67 | 59.00 |
-| StackExchange | 37.59 | **42.40** | 39.67 | 42.28 | 41.08 † | 40.57 |
-| AG News | **83.75** | 70.01 | 72.47 | 72.52 | 57.52 † | 72.56 |
-| BBC News | 86.90 | 70.17 | **96.73** | 94.80 | 65.07 † | 72.47 |
-| 20 Newsgroups | **56.85** | 47.21 | 52.02 † | 49.87 | 50.20 † | 52.78 |
-| Banking77 | 61.14 | 63.54 | 61.75 | 60.65 | 60.22 † | **66.73** |
+| TREC | 58.1 | **62.0** | 60.3 | 60.7 | 58.6 | 61.9 |
+| StackExchange | 37.6 | 42.0 | **42.7** | 42.0 | - | 42.5 |
+| AG News | 83.8 | **88.1** | - | - | - | - |
+| BBC News | 95.5 | **95.6** | - | - | - | - |
+| 20 Newsgroups | 59.2 | **62.4** | - | - | - | - |
+| Banking77 | 62.8 | **67.9** | - | - | - | - |
 
-† Refused requests received neutral probabilities: Luna Decisions on StackExchange (67), Luna Decisions on AG News (33), Luna Decisions on BBC News (3), Gemini Decision 1 on 20 Newsgroups (3), Luna Decisions on 20 Newsgroups (58), Luna Decisions on Banking77 (3).
+ACC (%), mean of seeds 0, 1, 2. Datasets where D-means beats the best baseline: Clef 6 of 6, Gemini Decision 1 2 of 2, Jev 1.14 2 of 2, Luna Decisions 1 of 1 and d1.2-ultra 2 of 2. A dash is a run not recorded yet: Gemini Decision 1, Jev 1.14, Luna Decisions and d1.2-ultra still need the remaining datasets.
 <!-- /bench:models -->
 
-Every displayed D-means score uses `consensus=False`. All six datasets use the selected decision model; the optional no-call consensus results remain in the raw results file for comparison.
-
-[Per-seed ACC, NMI, and ARI](bench/results/decision-model-comparison.json). The results file also includes the optional consensus strategy and recorded provider refusals.
+Every column replays offline from its own committed answers: `uv run python -m bench.semantic --model google/gemini-decision-1 --verify`, and `--current --verify` for Jev. Per-seed ACC, NMI and ARI are in `bench/results/semantic-<model>.json`. To fill a dash, add `--live --write --no-ablations --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`; answers already paid for come from the cache.
 
 ## Benchmark
 
 ```bash
 uv run python -m bench.semantic --model cloudflare/clef --verify  # current default strategy, offline
 uv run python -m bench.semantic --verify   # offline replay of the legacy Jev results
+uv run python -m bench.semantic --current --verify  # Jev with the default strategy, offline
 uv run python -m bench.semantic --live     # ask Jev again (needs OpenRouter credits)
 uv run python -m bench.mse --write         # engine benchmark, no decision model
 uv run python -m bench.convergence --verify # accuracy vs epochs, offline, about 25 s
@@ -288,7 +287,6 @@ Held-out MSE, seed 1. Wall times come from a shared, heavily loaded 18-core M5 M
 - It needs something the decision model can read for each point. On bare vectors use `EMeans` or `OMeans`.
 - It optimizes agreement with human categories, not squared error. By default it adds model calls for 30% of the points on top of K-means, so end-to-end cost is the model's, not the engine's.
 - The default path keeps K-means' structure and fixes its boundaries. If geometry splits one category across distant modes, only the v1 merge path (`start="merge"`) can rejoin it.
-- Jev is measured on two datasets so far, Clef on all six. Jev's run on the other four (`--live --write --datasets trec,stackexchange,ag-news,bbc-news,20-newsgroups,banking77`) asks about 31,000 new decisions, an estimated $1 to $2.
 - Replay rebuilds the exact requests, so it needs the embeddings in `.cache/emb`. A fresh clone re-embeds through OpenRouter on the first run.
 
 ## Background: E-means and O-means

@@ -276,6 +276,7 @@ class DMeans:
             raise ValueError("x and texts must have the same length")
         self.pairs, self.p_same, self.asked, self.changed = [], np.zeros(0), np.zeros(0, dtype=np.int64), 0
         self.partition_source = "decision"
+        self.micro_labels = None
         self.refinement = "none"
         if self.consensus:
             labels = self._consensus(x, texts)
@@ -298,6 +299,7 @@ class DMeans:
             log.info("k-means start: %d groups, best of %d initializations, inertia %.4g", self.k, self.restarts, km.inertia_)
         else:
             mc, ml = self._micro(x)
+            self.micro_labels = ml
             micro_cards = cards.build(self.vocab, texts, x, ml, len(mc))
             group = self._merge(mc, micro_cards)
             epochs = self.engine.epochs_run

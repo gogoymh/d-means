@@ -265,12 +265,12 @@ On five datasets accuracy rises with every extra point asked and levels off past
 
 **Why the merge path is no longer the default.** With Clef, the v1 merge path trailed on AG News, BBC News and 20 Newsgroups. Its micro-clusters were pure enough (95% on BBC News), but Clef answered "different topic" to most pairs from the same class, so average linkage merged on noise. Starting from K-means and spending the model's calls on the boundary wins on all six datasets. The merge path still scores higher on TREC (66.8 against 62.0), where answer type cuts across the embedding's topics; pass `start="merge"` when categories do not follow topical similarity.
 
-**Convergence of the v1 merge path.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,298 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where O-means draws over E-means, it scans every cell at that k.
+**Convergence of the v1 merge path.** How many passes over the data each method needs before its clusters match the real categories. Every point is a finished run with that epoch budget. The first chart is synthetic and runs offline: 6 topics, each spread over 4 sub-topic modes placed at random, so neighbouring modes often belong to different topics, with a simulated decider that reads the hidden topic and answers wrong one time in five. The TREC and StackExchange charts are real texts with real Jev answers (40,816 decisions, about $1, committed in [`bench/results/jev-convergence.jsonl.gz`](bench/results/jev-convergence.jsonl.gz)). Where O-means draws over E-means, it scans every cell at that k.
 
 <!-- bench:convergence -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-topics-dark.svg">
-  <img alt="Clustering accuracy vs. epochs: D-means clears the best baseline's final accuracy after 0.0213 epochs" src="assets/convergence-topics-light.svg" width="100%">
+  <img alt="Clustering accuracy vs. epochs: D-means clears the best baseline's final accuracy after 0.0313 epochs" src="assets/convergence-topics-light.svg" width="100%">
 </picture>
 
 | Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 41.1% |
@@ -278,9 +278,9 @@ On five datasets accuracy rises with every extra point asked and levels off past
 | K-means | - | 38.3 | 41.1 | 16 |
 | E-means | 37.4 | 39.6 | 40.8 | never |
 | O-means | 38.3 | 41.2 | 41.1 | 1 |
-| **D-means** | **48.0** | **49.8** | **49.9** | **0.0213** |
+| **D-means** | **47.7** | **49.8** | **49.9** | **0.0313** |
 
-Synthetic topics, mean of 50 seeds, decisions from a simulated decider, wrong on 20% of answers. The best baseline ends at 41.1% (K-means, 16 epochs). D-means passes it at its first budget, 0.0213 epochs, 47x sooner than the fastest baseline gets there (O-means, 1 epochs).
+Synthetic topics, mean of 50 seeds, decisions from a simulated decider, wrong on 20% of answers. The best baseline ends at 41.1% (K-means, 16 epochs). D-means passes it at its first budget, 0.0313 epochs, 32x sooner than the fastest baseline gets there (O-means, 1 epochs). Stages at 1/32, 1, 16 epochs: micro-cluster purity 72.8 → 79.2 → 81.5%, Noul AUC 74.0 → 74.9 → 73.8%, ACC after the merge 45.5 → 48.7 → 48.9%, after settling 47.7 → 49.8 → 49.9%.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-trec-dark.svg">
@@ -294,7 +294,7 @@ Synthetic topics, mean of 50 seeds, decisions from a simulated decider, wrong on
 | O-means | 33.3 | 54.3 | 60.1 | 16 |
 | **D-means** | **49.5** | **56.9** | **64.3** | **3.84** |
 
-TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 60.1% (O-means, 16 epochs). D-means passes it at 3.84 epochs, 4x sooner than the fastest baseline gets there (O-means, 16 epochs).
+TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 60.1% (O-means, 16 epochs). D-means passes it at 3.84 epochs, 4x sooner than the fastest baseline gets there (O-means, 16 epochs). Stages at 1/32, 1, 16 epochs: micro-cluster purity 51.8 → 66.8 → 69.3%, Noul AUC 79.6 → 82.0 → 84.1%, ACC after the merge 45.4 → 53.9 → 60.6%, after settling 49.5 → 56.9 → 64.3%.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/convergence-stackexchange-dark.svg">
@@ -304,14 +304,16 @@ TREC, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 60.1% 
 | Method | ACC at 1/32 epoch | ACC at 1 epoch | ACC at 16 epochs | Epochs to reach 37.5% |
 |:--|--:|--:|--:|--:|
 | K-means | - | **31.9** | 37.5 | 16 |
-| E-means | 6.5 | 26.7 | 37.0 | never |
-| O-means | 12.1 | 27.7 | 34.2 | never |
-| **D-means** | **22.6** | 31.2 | **42.5** | **1.96** |
+| E-means | 6.5 | 25.7 | 36.7 | never |
+| O-means | 12.1 | 29.5 | 35.4 | never |
+| **D-means** | **16.0** | 31.2 | **42.5** | **1.96** |
 
-StackExchange, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 37.5% (K-means, 16 epochs). D-means passes it at 1.96 epochs, 8x sooner than the fastest baseline gets there (K-means, 16 epochs).
+StackExchange, mean of 3 seeds, decisions from Jev 1.14. The best baseline ends at 37.5% (K-means, 16 epochs). D-means passes it at 1.96 epochs, 8x sooner than the fastest baseline gets there (K-means, 16 epochs). Stages at 1/32, 1, 16 epochs: micro-cluster purity 18.9 → 40.5 → 50.2%, Noul AUC 90.8 → 91.9 → 90.8%, ACC after the merge 14.4 → 28.8 → 39.7%, after settling 16.0 → 31.2 → 42.5%.
 <!-- /bench:convergence -->
 
 Geometry converges, but to the wrong partition, and more epochs do not fix it. On the synthetic topics D-means is past the best baseline after one mini-batch. On real texts D-means also gets there first: at 1.96 epochs on StackExchange (k=50), where E-means and O-means never reach the target, and at 3.84 epochs on TREC (k=6), where only O-means reaches it, at 16 epochs. D-means ends 4.2 points (TREC) and 5.0 points (StackExchange) above the best baseline. `bench.convergence --problems trec,stackexchange --seeds 0,1,2 --verify` replays the real curves offline.
+
+D-means never reads more rows than E-means at the same budget: below one epoch its micro-cluster engine reads exactly the official E-means' rows, shortening its last mini-batch to fit. Before, it rounded its step count up and read 0.512 passes where E-means read 0.5. The stage lines show where the low budgets lose accuracy. Below a quarter epoch, micro-clusters are close to random cells (TREC purity about 50%), so the merge has little to work with even though Noul AUC stays above 79%. From half an epoch on, the merge loses 9 to 13 points against that purity on TREC, and settling wins back 2 to 4.
 
 **Engines.** D-means' own NumPy E-means and O-means (`dmeans.EMeans`, `dmeans.OMeans`, used inside D-means and on bare vectors, not as benchmark baselines) reproduce what their authors report: E-means passes Lloyd's 25-iteration error within a few epochs, and O-means reaches it with a fraction of the distance computations.
 

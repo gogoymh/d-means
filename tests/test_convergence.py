@@ -29,6 +29,25 @@ def test_fastest_d_means_reaches_target_in_fewest_epochs(committed):
         assert p["mean"]["d-means"][0] >= p["target"]["acc"]  # already past it at the smallest budget
 
 
+def test_d_means_never_uses_more_passes_than_e_means(committed):
+    for name, p in committed["problems"].items():
+        assert p["epochs"]["d-means"] == p["epochs"]["e-means"], name
+        for t, d, e in zip(p["epochs"]["d-means"], p["passes"]["d-means"], p["passes"]["e-means"]):
+            assert d <= e + 1e-12, f"{name} @ {t:g} epochs: d-means {d} passes > e-means {e}"
+
+
+def test_real_curves_record_stage_diagnostics(committed):
+    for name in ("trec", "stackexchange"):
+        p = committed["problems"][name]
+        assert p["decider"] == "typesafe/jev-1.14" and p["seeds"] == [0, 1, 2]
+        assert set(p["stages"]) == set(cv.STAGES)
+        for key, vals in p["stages"].items():
+            assert len(vals) == len(p["epochs"]["d-means"]), (name, key)
+            assert all(v is not None and 0.0 <= v <= 1.0 for v in vals), (name, key, vals)
+        assert p["stages"]["settle_acc"] == pytest.approx(p["mean"]["d-means"])
+        assert all(m <= u + 1e-9 for m, u in zip(p["stages"]["merge_acc"], p["stages"]["micro_purity"]))  # purity bounds the merge
+
+
 def test_summary_follows_from_per_seed_accuracy(committed):
     for p in committed["problems"].values():
         runs = [{"acc": {m: p["acc"][m][i] for m in cv.METHODS}, "epochs": p["epochs"], "passes": p["passes"], "decisions_per_point": [p["decisions_per_point"]]} for i in range(len(p["seeds"]))]

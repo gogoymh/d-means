@@ -64,12 +64,12 @@
 <circle cx="653.3" cy="212.8" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
 <circle cx="728.0" cy="198.8" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
 </g>
-<g data-method="d-means"><path d="M58.6,257.3 L133.2,284.6 L207.9,250.7 L282.6,261.8 L357.2,215.0 L428.5,216.5 L503.1,201.0 L574.3,196.3 L641.5,191.5 L699.6,175.6" fill="none" stroke="#1f2328" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<g data-method="d-means"><path d="M58.6,257.3 L129.8,259.9 L204.5,250.4 L280.0,239.7 L354.7,224.2 L428.5,216.5 L503.1,201.0 L574.3,196.3 L641.5,191.5 L699.6,175.6" fill="none" stroke="#1f2328" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="58.6" cy="257.3" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="133.2" cy="284.6" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="207.9" cy="250.7" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="282.6" cy="261.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="357.2" cy="215.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="129.8" cy="259.9" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="204.5" cy="250.4" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="280.0" cy="239.7" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="354.7" cy="224.2" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
 <circle cx="428.5" cy="216.5" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
 <circle cx="503.1" cy="201.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
 <circle cx="574.3" cy="196.3" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>

@@ -67,3 +67,22 @@ def test_omeans_short_runs_close_with_recency_mean(problem):
     c, _ = o.fit(xtr)
     assert o.recipe["closing"] == "recency"
     assert np.isfinite(mse(xte, c))
+
+
+@pytest.mark.parametrize("nepochs", [1 / 32, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1.5])
+def test_fractional_budget_reads_no_more_rows_than_official_emeans(nepochs):
+    from faiss.contrib.e_means.base import _epoch_rows  # the official E-means' rows per budget
+
+    x = np.random.default_rng(0).normal(size=(500, 768)).astype(np.float32)
+    e = EMeans(18, nepochs=nepochs, seed=0)
+    e.fit(x)
+    assert e.epochs_run == sum(_epoch_rows(len(x), nepochs)) / len(x)
+
+
+@pytest.mark.parametrize("nepochs", [1, 2, 4])
+def test_whole_budget_keeps_full_batches(nepochs):
+    x = np.random.default_rng(0).normal(size=(500, 768)).astype(np.float32)
+    e = EMeans(18, nepochs=nepochs, seed=0)
+    e.fit(x)
+    b = e.recipe["batch_size"]
+    assert e.epochs_run == nepochs * (len(x) // b) * b / len(x) <= nepochs

@@ -42,9 +42,31 @@ def recipe(n: int, k: int, d: int, nepochs: float, batch_law: str = "auto") -> d
         "batch_size": b,
         "alpha0": alpha0,
         "steps_per_pass": steps_per_pass,
-        "total_steps": max(1, int(round(nepochs * steps_per_pass))),
+        "total_steps": total_steps(n, b, nepochs),
         "revival": d > 2,
     }
+
+
+def budget_rows(n: int, nepochs: float) -> int:
+    """Rows a budget of `nepochs` passes may read, rounded as the official E-means does (at least one)."""
+    whole = math.floor(nepochs)
+    return max(1, whole * n + int(round((nepochs - whole) * n)))
+
+
+def run_rows(n: int, b: int, nepochs: float) -> int:
+    """Rows a run reads: never more than its budget allows.
+
+    A whole budget reads nepochs x (n // b) full batches, as before. A fractional budget used to
+    round its step count up (2 batches of 128 for half of 500 rows: 0.512 passes, more than the
+    official E-means' 0.5); it now reads exactly its budget, the last batch shortened to fit.
+    """
+    if float(nepochs).is_integer():
+        return max(1, int(nepochs) * max(1, n // b) * b)
+    return budget_rows(n, nepochs)
+
+
+def total_steps(n: int, b: int, nepochs: float) -> int:
+    return -(-run_rows(n, b, nepochs) // b)
 
 
 def cosine_step(alpha0: float, t: int, total: int) -> float:
@@ -110,9 +132,10 @@ class EMeans:
         if self.batch_size:
             rec["batch_size"] = self.batch_size
             rec["steps_per_pass"] = max(1, n // self.batch_size)
-            rec["total_steps"] = max(1, int(round(self.nepochs * rec["steps_per_pass"])))
+            rec["total_steps"] = total_steps(n, self.batch_size, self.nepochs)
         self.recipe = rec
         b, total = rec["batch_size"], rec["total_steps"]
+        budget, read = run_rows(n, b, self.nepochs), 0
         c0 = x[rng.choice(n, k, replace=False)] if init is None else np.asarray(init, dtype=np.float32)
         n_mass = np.full(k, 1e-10)
         s = c0.astype(np.float64) * n_mass[:, None]
@@ -127,7 +150,8 @@ class EMeans:
             for p in range(rec["steps_per_pass"]):
                 if t >= total:
                     break
-                rows = perm[p * b : (p + 1) * b]
+                rows = perm[p * b : (p + 1) * b][: budget - read]  # the last batch stops at the budget
+                read += len(rows)
                 xb = x[rows]
                 a = self._assign(xb, xn[rows], c)
                 labels[rows] = a
@@ -152,7 +176,7 @@ class EMeans:
                     on_step(t, c)
         c = self._close(x, labels, c, rec)
         self.centroids, self.labels = c, labels
-        self.epochs_run = total * b / n  # passes over the data actually made (steps x batch / n)
+        self.epochs_run = read / n  # passes over the data actually made
         log.debug("%s done n=%d k=%d steps=%d batch=%d alpha0=%.4f revived=%d", self.name, n, k, total, b, rec["alpha0"], revived_total)
         return c, labels
 

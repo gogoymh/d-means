@@ -283,6 +283,21 @@ def reach_sentence(p: dict) -> tuple[str, str]:
     )
 
 
+def stage_sentence(p: dict) -> str:
+    """Where D-means' accuracy comes from at the smallest, middle and largest budget (merge path stages)."""
+    st = p.get("stages")
+    if not st:
+        return ""
+    ep = p["epochs"]["d-means"]
+    idx = [0, ep.index(1), len(ep) - 1]
+    def row(key: str) -> str:
+        return " → ".join(_pct(st[key][i]) for i in idx)
+    return (
+        f" Stages at {', '.join(chart.frac(ep[i]) for i in idx)} epochs: micro-cluster purity {row('micro_purity')}%, "
+        f"Noul AUC {row('noul_auc')}%, ACC after the merge {row('merge_acc')}%, after settling {row('settle_acc')}%."
+    )
+
+
 def convergence_block(res: dict) -> str:
     parts = []
     for prob, p in res["problems"].items():
@@ -308,6 +323,7 @@ def convergence_block(res: dict) -> str:
             + "\n".join(rows)
             + f"\n\n{chart.name(p)}, mean of {len(p['acc']['d-means'])} seeds, decisions from {_decider(p)}. The best baseline ends at {100 * target['acc']:.1f}% "
             f"({target['method'].capitalize()}, {chart.frac(target['epochs'])} epochs). {verdict}"
+            + stage_sentence(p)
         )
     return "\n\n".join(parts)
 

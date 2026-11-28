@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 484" width="800" height="484" role="img" aria-labelledby="t d">
-<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (K-means). Epochs needed to reach it: D-means 0.0213, K-means 16, E-means never, O-means 1.</desc>
+<title id="t">Clustering accuracy vs. epochs</title><desc id="d">Mean clustering accuracy against passes over the data. The best baseline ends at 41.1% (K-means). Epochs needed to reach it: D-means 0.0313, K-means 16, E-means never, O-means 1.</desc>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;fill:#59636e;font-size:12px}.h{fill:#1f2328;font-size:17px;font-weight:600}.n{font-variant-numeric:tabular-nums}.k{fill:#1f2328;font-weight:600}</style>
 <text class="h" x="56" y="32">Clustering accuracy vs. epochs</text>
 <text x="56" y="54">Synthetic topics, n=3,000, k=6. Mean of 50 seeds. Decisions: simulated, wrong on 20% of answers, 0.18 per point.</text>
@@ -16,64 +16,63 @@
 <text x="46" y="240.0" text-anchor="end" class="n">50</text>
 <line x1="56" y1="144.0" x2="728" y2="144.0" stroke="#eaeef2" stroke-width="1"/>
 <text x="46" y="148.0" text-anchor="end" class="n">60</text>
-<text x="56.0" y="440" text-anchor="middle" class="n">1/64</text>
-<text x="123.2" y="440" text-anchor="middle" class="n">1/32</text>
-<text x="190.4" y="440" text-anchor="middle" class="n">1/16</text>
-<text x="257.6" y="440" text-anchor="middle" class="n">1/8</text>
-<text x="324.8" y="440" text-anchor="middle" class="n">1/4</text>
-<text x="392.0" y="440" text-anchor="middle" class="n">1/2</text>
-<text x="459.2" y="440" text-anchor="middle" class="n">1</text>
-<text x="526.4" y="440" text-anchor="middle" class="n">2</text>
-<text x="593.6" y="440" text-anchor="middle" class="n">4</text>
-<text x="660.8" y="440" text-anchor="middle" class="n">8</text>
+<text x="56.0" y="440" text-anchor="middle" class="n">1/32</text>
+<text x="130.7" y="440" text-anchor="middle" class="n">1/16</text>
+<text x="205.3" y="440" text-anchor="middle" class="n">1/8</text>
+<text x="280.0" y="440" text-anchor="middle" class="n">1/4</text>
+<text x="354.7" y="440" text-anchor="middle" class="n">1/2</text>
+<text x="429.3" y="440" text-anchor="middle" class="n">1</text>
+<text x="504.0" y="440" text-anchor="middle" class="n">2</text>
+<text x="578.7" y="440" text-anchor="middle" class="n">4</text>
+<text x="653.3" y="440" text-anchor="middle" class="n">8</text>
 <text x="728.0" y="440" text-anchor="middle" class="n">16</text>
 <text x="392.0" y="468" text-anchor="middle" class="k">Epochs: passes over the data (log scale)</text>
 <line x1="56" y1="317.4" x2="728" y2="317.4" stroke="#59636e" stroke-width="1" stroke-opacity="0.55"/>
 <text x="64" y="310.4">Best baseline final: 41.1% (K-means, 16 epochs)</text>
-<g data-method="k-means"><path d="M459.2,343.8 L526.4,332.5 L593.6,323.4 L660.8,320.6 L728.0,317.4" fill="none" stroke="#257de0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="459.2" cy="343.8" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
-<circle cx="526.4" cy="332.5" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
-<circle cx="593.6" cy="323.4" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
-<circle cx="660.8" cy="320.6" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
+<g data-method="k-means"><path d="M429.3,343.8 L504.0,332.5 L578.7,323.4 L653.3,320.6 L728.0,317.4" fill="none" stroke="#257de0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="429.3" cy="343.8" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
+<circle cx="504.0" cy="332.5" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
+<circle cx="578.7" cy="323.4" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
+<circle cx="653.3" cy="320.6" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
 <circle cx="728.0" cy="317.4" r="3.5" fill="#257de0" stroke="#ffffff" stroke-width="2"/>
 </g>
-<g data-method="e-means"><path d="M123.5,351.8 L190.7,340.6 L257.6,325.4 L324.8,337.6 L392.0,331.7 L459.2,331.5 L526.4,324.7 L593.6,319.9 L660.8,321.3 L728.0,320.3" fill="none" stroke="#f47230" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="123.5" cy="351.8" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="190.7" cy="340.6" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="257.6" cy="325.4" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="324.8" cy="337.6" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="392.0" cy="331.7" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="459.2" cy="331.5" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="526.4" cy="324.7" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="593.6" cy="319.9" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
-<circle cx="660.8" cy="321.3" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<g data-method="e-means"><path d="M56.3,351.8 L131.0,340.6 L205.3,325.4 L280.0,337.6 L354.7,331.7 L429.3,331.5 L504.0,324.7 L578.7,319.9 L653.3,321.3 L728.0,320.3" fill="none" stroke="#f47230" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="56.3" cy="351.8" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="131.0" cy="340.6" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="205.3" cy="325.4" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="280.0" cy="337.6" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="354.7" cy="331.7" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="429.3" cy="331.5" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="504.0" cy="324.7" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="578.7" cy="319.9" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
+<circle cx="653.3" cy="321.3" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
 <circle cx="728.0" cy="320.3" r="3.5" fill="#f47230" stroke="#ffffff" stroke-width="2"/>
 </g>
-<g data-method="o-means"><path d="M123.5,343.4 L190.7,337.7 L257.6,335.0 L324.8,325.9 L392.0,324.8 L459.2,316.7 L526.4,322.5 L593.6,314.5 L660.8,320.2 L728.0,317.9" fill="none" stroke="#00b894" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="123.5" cy="343.4" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="190.7" cy="337.7" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="257.6" cy="335.0" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="324.8" cy="325.9" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="392.0" cy="324.8" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="459.2" cy="316.7" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="526.4" cy="322.5" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="593.6" cy="314.5" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
-<circle cx="660.8" cy="320.2" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<g data-method="o-means"><path d="M56.3,343.4 L131.0,337.7 L205.3,335.0 L280.0,325.9 L354.7,324.8 L429.3,316.7 L504.0,322.5 L578.7,314.5 L653.3,320.2 L728.0,317.9" fill="none" stroke="#00b894" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="56.3" cy="343.4" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="131.0" cy="337.7" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="205.3" cy="335.0" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="280.0" cy="325.9" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="354.7" cy="324.8" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="429.3" cy="316.7" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="504.0" cy="322.5" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="578.7" cy="314.5" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
+<circle cx="653.3" cy="320.2" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
 <circle cx="728.0" cy="317.9" r="3.5" fill="#00b894" stroke="#ffffff" stroke-width="2"/>
 </g>
-<g data-method="d-means"><path d="M86.2,254.7 L192.7,256.0 L259.9,255.6 L327.1,247.9 L390.2,243.7 L457.4,237.5 L524.6,263.8 L591.8,249.8 L654.7,254.2 L712.6,237.0" fill="none" stroke="#1f2328" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="86.2" cy="254.7" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="192.7" cy="256.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="259.9" cy="255.6" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="327.1" cy="247.9" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="390.2" cy="243.7" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="457.4" cy="237.5" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="524.6" cy="263.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="591.8" cy="249.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="654.7" cy="254.2" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
-<circle cx="712.6" cy="237.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<g data-method="d-means"><path d="M56.3,256.8 L131.0,244.0 L205.3,233.5 L280.0,239.5 L354.7,232.8 L427.3,237.5 L502.0,263.8 L576.6,249.8 L646.5,254.2 L710.9,237.0" fill="none" stroke="#1f2328" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="56.3" cy="256.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="131.0" cy="244.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="205.3" cy="233.5" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="280.0" cy="239.5" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="354.7" cy="232.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="427.3" cy="237.5" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="502.0" cy="263.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="576.6" cy="249.8" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="646.5" cy="254.2" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
+<circle cx="710.9" cy="237.0" r="4.5" fill="#1f2328" stroke="#ffffff" stroke-width="2"/>
 </g>
-<line x1="86.2" y1="150" x2="86.2" y2="246.7" stroke="#1f2328" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="92.2" y="158" class="k">D-means reaches it at 0.0213 epochs</text>
-<text x="722.6" y="241.0" class="k n">49.9%</text>
+<line x1="56.3" y1="150" x2="56.3" y2="248.8" stroke="#1f2328" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="62.3" y="158" class="k">D-means reaches it at 0.0313 epochs</text>
+<text x="720.9" y="241.0" class="k n">49.9%</text>
 </svg>

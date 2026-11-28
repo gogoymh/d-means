@@ -40,6 +40,7 @@ METHODS = ["k-means", "e-means", "o-means", "d-means"]
 BASELINES = METHODS[:-1]
 EPOCHS = [1 / 32, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16]
 SEEDS = list(range(50))
+REAL_SEEDS = [0, 1, 2]  # the committed real-text curves
 ERROR = 0.2
 
 
@@ -113,13 +114,52 @@ class SimulatedDecider:
         return [self._one(r) for r in reqs]
 
 
+# --- stage diagnostics ----------------------------------------------------------------------
+STAGES = ["micro_purity", "noul_auc", "noul_acc", "merge_acc", "settle_acc"]
+
+
+def stages(dm: DMeans, y: np.ndarray) -> dict:
+    """Where a merge-path d-means run gains or loses accuracy, stage by stage.
+
+    micro_purity: share of points whose micro-cluster's majority label is their own, the ceiling
+    for any merge. noul_auc / noul_acc: how well the asked Noul answers rank and call the pairs,
+    graded against "both micro-clusters have the same majority label". merge_acc: accuracy after
+    the merge, before any point is settled. settle_acc: accuracy after settling.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    ml = dm.micro_labels
+    m = int(ml.max()) + 1
+    table = np.zeros((m, int(y.max()) + 1), dtype=np.int64)
+    np.add.at(table, (ml, y), 1)
+    major = table.argmax(1)
+    out = {"micro_purity": float(table.max(1).sum() / len(y)), "noul_auc": None, "noul_acc": None}
+    if len(dm.pairs):
+        ii, jj = np.array(dm.pairs).T
+        same = major[ii] == major[jj]
+        out["noul_acc"] = float(np.mean((dm.p_same > 0.5) == same))
+        if 0 < same.sum() < same.size:
+            out["noul_auc"] = float(roc_auc_score(same, dm.p_same))
+    out["merge_acc"] = accuracy(y, dm.merge_labels)
+    out["settle_acc"] = accuracy(y, dm.labels)
+    return out
+
+
+def stage_means(runs: list[dict]) -> dict:
+    """Mean of each stage metric per budget over seeds (a seed with no graded pair is skipped)."""
+    out = {}
+    for key in STAGES:
+        rows = np.array([[np.nan if s[key] is None else s[key] for s in r["stages"]] for r in runs], dtype=float)
+        out[key] = [float(np.mean(c[np.isfinite(c)])) if np.isfinite(c).any() else None for c in rows.T]
+    return out
+
+
 # --- curves -----------------------------------------------------------------------------------
-def _real(name: str, live: bool) -> tuple[dict, Decisions]:
+def _real(name: str) -> dict:
     from . import data, embed
 
     ds = data.load(name)
-    prob = {"x": embed.embed(name, ds.texts), "texts": ds.texts, "labels": ds.labels, "k": ds.k, "about": ds.about}
-    return prob, Decisions(JEV, ANSWERS, offline=not live)
+    return {"x": embed.embed(name, ds.texts), "texts": ds.texts, "labels": ds.labels, "k": ds.k, "about": ds.about}
 
 
 def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:
@@ -128,7 +168,7 @@ def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:
     k-means is Lloyd from k-means++ seeds; its seeding passes are not counted, which favours it.
     """
     x, y, k = prob["x"], prob["labels"], prob["k"]
-    out = {"epochs": {m: [] for m in METHODS}, "passes": {m: [] for m in METHODS}, "acc": {m: [] for m in METHODS}, "decisions_per_point": []}
+    out = {"epochs": {m: [] for m in METHODS}, "passes": {m: [] for m in METHODS}, "acc": {m: [] for m in METHODS}, "decisions_per_point": [], "stages": []}
 
     def add(m: str, t: float, passes: float, acc: float) -> None:
         out["epochs"][m].append(t)
@@ -148,6 +188,8 @@ def curves(prob: dict, decider, seed: int, epochs: list[float]) -> dict:
         lab = dm.fit(x, prob["texts"])
         add("d-means", t, dm.report["engine_epochs"], accuracy(y, lab))
         out["decisions_per_point"].append(dm.report["decisions_per_point"])
+        out["stages"].append(stages(dm, y))
+        log.info("seed %d @ %g epochs: d-means passes %.4f, stages %s", seed, t, dm.report["engine_epochs"], {k_: None if v is None else round(v, 3) for k_, v in out["stages"][-1].items()})
     log.info("seed %d: final acc k-means %.3f, e-means %.3f, o-means %.3f, d-means %.3f", seed, *(out["acc"][m][-1] for m in METHODS))
     return out
 
@@ -165,7 +207,9 @@ def summarize(runs: list[dict]) -> dict:
     best = max(BASELINES, key=lambda m: mean[m][-1])
     target = {"method": best, "acc": mean[best][-1], "epochs": runs[0]["epochs"][best][-1]}
     reach = {m: next((x for x, v in zip(passes[m], mean[m]) if v >= target["acc"] - 1e-12), None) for m in METHODS}
+    extra = {"stages": stage_means(runs)} if all("stages" in r for r in runs) else {}
     return {
+        **extra,
         "epochs": runs[0]["epochs"],
         "passes": passes,
         "mean": mean,
@@ -187,22 +231,22 @@ def fastest_problems(result: dict) -> list[str]:
     return ok
 
 
-def run(names: list[str], seeds: list[int], epochs: list[float], live: bool = False) -> dict:
+def run(names: list[str], seeds: list[int], epochs: list[float], live: bool = False, prune: bool = False) -> dict:
+    """Curves for each problem. Real problems share one Jev cache; with `prune`, answers this run did not use are dropped."""
     out = {"problems": {}}
+    jev = Decisions(JEV, ANSWERS, offline=not live) if any(n != "topics" for n in names) else None
     for name in names:
-        jev = None
         if name == "topics":
             prob = topics()
             decider = SimulatedDecider(prob["texts"], prob["labels"])
             meta = {"source": "synthetic", "decider": f"simulated, wrong on {ERROR:.0%} of answers"}
         else:
-            prob, jev = _real(name, live)
-            decider = jev
+            prob, decider = _real(name), jev
             meta = {"source": name, "decider": jev.model}
         try:
             runs = [curves(prob, decider, s, epochs) for s in seeds]
         finally:
-            if jev is not None and live:
+            if decider is jev and live:
                 jev.save()
         p = {**meta, "n": len(prob["texts"]), "k": prob["k"], "seeds": seeds}
         if isinstance(decider, SimulatedDecider):
@@ -210,6 +254,10 @@ def run(names: list[str], seeds: list[int], epochs: list[float], live: bool = Fa
         p.update(summarize(runs))
         out["problems"][name] = p
         log.info("%s: target %.3f (%s final); epochs to reach it %s", name, p["target"]["acc"], p["target"]["method"], p["epochs_to_target"])
+    if jev is not None:
+        log.info("Jev answers used by this run: %d", len(jev.used))
+        if prune:
+            jev.save(keep=jev.used)
     return out
 
 
@@ -253,7 +301,11 @@ def main(argv: list[str] | None = None) -> int:
     _log.setup()
     t0 = time.perf_counter()
     try:
-        result = run(a.problems.split(","), [int(s) for s in a.seeds.split(",")], EPOCHS, live=a.live)
+        names = a.problems.split(",")
+        old = json.loads(OUT.read_text()) if OUT.exists() else {"problems": {}}
+        real = {n for n, p in old["problems"].items() if p["source"] != "synthetic"}
+        prune = a.write and a.seeds == ",".join(map(str, REAL_SEEDS)) and real <= set(names)  # the run replays every committed real curve
+        result = run(names, [int(s) for s in a.seeds.split(",")], EPOCHS, live=a.live, prune=prune)
     except CacheMiss as e:
         log.error("Jev answer %s is not in %s; run with --live to ask Jev", e, ANSWERS)
         return 2
@@ -265,6 +317,10 @@ def main(argv: list[str] | None = None) -> int:
             cells = " ".join(f"{100 * row[t]:7.1f}" if t in row else f"{'-':>7s}" for t in EPOCHS)
             reach = p["epochs_to_target"][m]
             print(f"  {m:10s} {cells}   {'never' if reach is None else f'{reach:.3g}'}")
+        print(f"  {'passes':10s} " + " ".join(f"{v:7.3f}" for v in p["passes"]["d-means"]) + "   d-means")
+        print(f"  {'e-passes':10s} " + " ".join(f"{v:7.3f}" for v in p["passes"]["e-means"]) + "   e-means")
+        for key, vals in p.get("stages", {}).items():
+            print(f"  {key:10.10s} " + " ".join(f"{'-':>7s}" if v is None else f"{100 * v:7.1f}" for v in vals) + "   d-means stage")
     if a.write:  # merge by problem, so a run of one dataset keeps the others
         old = json.loads(OUT.read_text()) if OUT.exists() else {"problems": {}}
         OUT.write_text(dumps({"problems": {**old["problems"], **result["problems"]}}))
